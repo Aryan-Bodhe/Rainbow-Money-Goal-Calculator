@@ -18,15 +18,19 @@ It allows users to input their investment goals, expected returns, and lumpsum a
 ## Installation
 
 1. Clone the repository:
-
+   ```
    git clone https://github.com/Aryan-Bodhe/Rainbow-Money-Goal-Calculator.git
    cd goal-based-sip
+   ```
 
 2. Install dependencies (preferably in a virtual environment):
 
+   ```
+   python -m venv env
    pip install -r requirements.txt
+   ```
 
-3. Required Python packages:
+4. Required Python packages:
 
    * `matplotlib`
    * `pandas`
@@ -38,8 +42,9 @@ It allows users to input their investment goals, expected returns, and lumpsum a
 ## Usage
 
 Run the SIP analysis tool from the command line:
-
+```
 python app.py
+```
 
 
 ### Workflow:
@@ -88,7 +93,7 @@ python app.py
 ---
 
 ## Example Output
-
+```
 ----------------------------------------------------
 SIP Details:
 Target Goal Amount : 1000000.0
@@ -101,9 +106,9 @@ Monthly SIP amount : 5623.45
 Total SIP Amount : 674814.00
 Total Investment Amount : 724814.00
 ----------------------------------------------------
+```
 
-
-A plot named `returns_histogram.png` will be saved in the `temp` folder showing the invested amount and returns over the 10-year horizon.
+A plot named `returns_histogram.png` will be saved in the `temp/` folder showing the invested amount and returns over the 10-year horizon.
 
 ---
 
@@ -125,6 +130,3 @@ For questions, feature requests, or contributions, please open an issue or conta
 ---
 
 Thank you for using the Goal-Based SIP Calculator & Visualizer! 🚀
-
-```
-```
