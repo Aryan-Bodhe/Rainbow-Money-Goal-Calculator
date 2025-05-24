@@ -30,6 +30,9 @@ class SipCalculator:
         FV = sip_plan.goal_amount
         L = sip_plan.lumpsum_amount
 
+        if r == 0:
+            raise ZeroDivisionError('[ERROR] Return rate is zero.')
+
         # SIP annuity formula adjusted for lumpsum at t=0
         monthly_sip = (FV - L * (1 + r) ** months) / (((1 + r) ** months - 1) / r)
 

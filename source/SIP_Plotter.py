@@ -2,8 +2,9 @@ import os
 from typing import Tuple, List
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MultipleLocator, FixedLocator
-from source.SIP_Goal_Based import SipGoalBased as SGP
+from source.SIP_Return_Forecaster import SIPReturnForecaster as SRF
 
+from source.SIP_Goal_Based import SipGoalBased as SGP, INDEX_MONTHLY_DATA_PATH
 class SipPlotter:
     """
     A class to visualize SIP (Systematic Investment Plan) portfolio performance
@@ -20,12 +21,16 @@ class SipPlotter:
         Args:
             sip_plan (SGP): An instance of SipGoalBased containing SIP details.
         """
-        months, investment, total_value = self._simulate_portfolio_returns(sip_plan)
+
+        investment = sip_plan.cumulative_investment
+        returns = sip_plan.cumulative_returns
+        total_months = sip_plan.time_horizon * 12 + 1
+        months = list(range(total_months))
         
         # Compute returns = total_value - invested amount
         # Clamp any near-zero negative returns (likely due to float precision) to 0
-        returns = [tv - inv for tv, inv in zip(total_value, investment)]
-        returns = [ret if ret > 1e-6 else 0 for ret in returns]
+        # returns = [tv - inv for tv, inv in zip(total_value, investment)]
+        # returns = [ret if ret > 1e-6 else 0 for ret in returns]
 
         # Determine the month where the goal is achieved
         maturity_month = self._find_goal_achievement_month(
@@ -110,57 +115,7 @@ class SipPlotter:
         plt.gca().yaxis.set_major_locator(MultipleLocator(y_interval))
 
         plt.legend()
-
-    def _simulate_portfolio_returns(
-        self, sip_plan: SGP
-    ) -> Tuple[List[int], List[float], List[float]]:
-        """
-        Simulate portfolio values and investment over time.
-
-        Args:
-            sip_plan (SGP): SIP parameters including amount, rate, and duration.
-
-        Returns:
-            Tuple: (months, investment values, portfolio values)
-        """
-        M = sip_plan.time_horizon * 12  # Total months
-        r = sip_plan.return_rate / 100 / 12  # Monthly return rate
-        s = sip_plan.monthly_sip
-        L = sip_plan.lumpsum_amount
-
-        total_months = M + 1  # Include final redemption month
-        months = list(range(total_months))
-
-        investment = []
-        total_value = []
-
-        for m in months:
-            # Cumulative investment till the start of month m
-            if L > 0:
-                inv = L + s * max(0, m - 1)  # lumpsum at start, SIP starts from month 1
-            else:
-                inv = s * m
-            investment.append(inv)
-
-            # Future value calculation for lumpsum + SIP (annuity-due formula)
-            if L > 0:
-                lumpsum_growth = L * (1 + r) ** m
-                sip_growth = (
-                    s * (((1 + r) ** m - 1) / r) * (1 + r)
-                    if m > 0
-                    else 0
-                )
-                val = lumpsum_growth + sip_growth
-            else:
-                val = (
-                    s * (((1 + r) ** m - 1) / r) * (1 + r)
-                    if m > 0
-                    else 0
-                )
-
-            total_value.append(val)
-
-        return months, investment, total_value
+            
 
     def _find_goal_achievement_month(
         self, investment: List[float], returns: List[float],
