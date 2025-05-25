@@ -127,5 +127,6 @@ class SipGoalBased:
         print(f"Portfolio XIRR (Worst Case) : {forecaster.get_expected_sip_return(time_horizon=self.time_horizon, mode="pessimistic")}%")
         print(f"Portfolio XIRR (Median)  : {forecaster.get_expected_sip_return(time_horizon=self.time_horizon, mode="median")}%")
         print(f"Portfolio XIRR (Best Case) : {forecaster.get_expected_sip_return(time_horizon=self.time_horizon, mode="optimistic")}%")
-        print("----------------------------------------------------\n")
+        # print("----------------------------------------------------\n")
+        
         del forecaster

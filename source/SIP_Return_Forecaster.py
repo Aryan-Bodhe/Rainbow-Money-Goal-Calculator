@@ -152,7 +152,7 @@ class SIPReturnForecaster:
             return round(series.median(), 2)
         elif mode == "mean":
             return round(series.mean(), 2)
-            # return series.iloc[-1]
+            # return series.iloc[-1] use for latest period return
         elif mode == "pessimistic":
             return round(series.quantile(0.25), 2)
         elif mode == "optimistic":

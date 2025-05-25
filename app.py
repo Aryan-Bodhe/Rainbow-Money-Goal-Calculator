@@ -4,6 +4,7 @@ from source.SIP_Goal_Based import SipGoalBased
 from source.SIP_Return_Forecaster import SIPReturnForecaster
 from colorama import Fore, init
 from config import INDEX_MONTHLY_DATA_PATH
+from source.SIP_Probability_Calculator import SipProbabilityCalculator
 
 
 def run_sip_analysis():
@@ -56,6 +57,7 @@ def run_sip_testing():
     sip_plotter = SipPlotter()
     sip_plan = SipGoalBased()
     forecaster = SIPReturnForecaster(INDEX_MONTHLY_DATA_PATH)
+    probcalc = SipProbabilityCalculator(INDEX_MONTHLY_DATA_PATH)
 
     goal = 10000000
     times = [1,3,5,10]
@@ -68,7 +70,7 @@ def run_sip_testing():
             print(Fore.RED + str(e))
             return  # Exit on invalid input
         
-        sip_plan.return_rate = forecaster.get_expected_sip_return(time_horizon=sip_plan.time_horizon, mode='mean')
+        sip_plan.return_rate = forecaster.get_expected_sip_return(time_horizon=sip_plan.time_horizon, mode='median')
 
         # Step 2: Compute required monthly SIP amount
         try:
@@ -98,6 +100,14 @@ def run_sip_testing():
         # Step 4: Display SIP summary and plot results
         sip_plan.display_sip_data()
         sip_plotter.plot_returns(sip_plan)    
+
+
+        print()
+        prob_to_goal = probcalc.probability_of_goal(sip_plan.goal_amount, sip_plan.time_horizon, sip_plan.monthly_sip)
+        print(f'Estimated probability of reaching goal : {prob_to_goal*100:.2f}%.')
+        optimal_sip = probcalc.suggest_sip_for_probability(sip_plan)
+        print(f'Suggested SIP for 95% chance of reaching goal : {optimal_sip:.2f}.')
+
 
 
 if __name__ == '__main__':
