@@ -5,6 +5,7 @@ from datetime import datetime
 import pyxirr
 
 from source.SIP_Return_Forecaster import SIPReturnForecaster
+from source.Currency_Converter import CurrencyConverter
 from source.Exceptions import (
     InvalidStartDateError,
     LumpsumEnoughToReachGoalError, 
@@ -46,6 +47,17 @@ class Asset:
         self._df: pd.DataFrame | None = None     # loaded historical DataFrame
 
 
+    def convert_navs_to_inr(self) -> None:
+        """
+        Converts the NAV of the historical data to inr using date-matched conversion rates.
+        """
+        curr_conv = CurrencyConverter()
+        if self._df is None:
+            self.load_history()
+
+        self._df = curr_conv.convert_to_inr(nav_data=self._df)
+            
+
     def load_history(self) -> None:
         """
         Reads the Feather file into self._df, normalizes dates to midnight, and sorts.
@@ -55,7 +67,7 @@ class Asset:
         df = df.sort_values('Date').reset_index(drop=True)
         self._df = df
 
-
+            
     def compute_expected_return(
         self,
         time_horizon: int,
@@ -72,7 +84,7 @@ class Asset:
 
         expected = forecaster.get_expected_sip_return_rate(
             time_horizon=time_horizon,
-            feather_path=self.feather_path,
+            df=self._df,
             mode=mode
         )
         self.expected_return_rate = expected
@@ -87,7 +99,7 @@ class Asset:
         monthly_rate: float
     ) -> float:
         """
-        Applies your exact SIP formula for this asset:
+        Applies your ordinary annuity SIP formula for this asset:
             sip = ((FV - L*(1+r)^n) / (((1+r)^n - 1)/r)) * weight
 
         :param total_FV: The overall portfolio goal (₹).

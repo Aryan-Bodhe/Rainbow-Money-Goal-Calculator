@@ -21,7 +21,7 @@ class SIPReturnForecaster:
         self, df: pd.DataFrame, time_horizon: int, sip_amount: float = 1000
     ) -> List[float]:
         """
-        (Unchanged) Compute XIRRs for rolling SIP windows using historical data.
+        Compute XIRRs for rolling SIP windows using historical data.
         """
         months = time_horizon * 12
         xirrs: List[float] = []
@@ -34,8 +34,8 @@ class SIPReturnForecaster:
             dates = list(window['Date'][:months])
             amounts = [-sip_amount] * months
 
-            start_prices = window['NAV'].iloc[:months].values
-            end_price = window['NAV'].iloc[months]
+            start_prices = window['NAV_INR'].iloc[:months].values
+            end_price = window['NAV_INR'].iloc[months]
 
             units = [sip_amount / p for p in start_prices]
             total_units = sum(units)

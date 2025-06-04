@@ -5,24 +5,24 @@ Time Horizon      : 10 years
 Lumpsum Amount    : ₹5,000,000.00
 Total Monthly SIP : SIP not required. Lumpsum enough to reach Goal.
 Risk Profile      : Conservative
-Portfolio Growth  : 138.83%
+Portfolio Growth  : 148.55%
 
 Asset Allocation & Expected Returns:
   • Smallcap   weight=0.05, exp_return=14.91%, SIP=₹0.00
   • Midcap     weight=0.05, exp_return=15.50%, SIP=₹0.00
-  • Largecap   weight=0.20, exp_return=12.43%, SIP=₹0.00
+  • S&p_500    weight=0.20, exp_return=14.44%, SIP=₹0.00
   • Debt       weight=0.40, exp_return=5.82%, SIP=₹0.00
   • Gold       weight=0.30, exp_return=8.01%, SIP=₹0.00
 
 Asset-Level XIRRs:
   • Smallcap   XIRR = 15.96%
   • Midcap     XIRR = 16.64%
-  • Largecap   XIRR = 13.16%
+  • S&p_500    XIRR = 15.43%
   • Debt       XIRR = 5.97%
   • Gold       XIRR = 8.31%
 
-Portfolio XIRR (combined): 9.69%
+Portfolio XIRR (combined): 10.33%
 ------------------------------------------
 
-Probability of reaching ₹10,000,000 in 10 years: 79.09%
-Suggested total monthly SIP for 95% probability: ₹11,606.22
+Probability of reaching ₹10,000,000 in 10 years: 94.38%
+Suggested total monthly SIP for 95% probability: ₹553.13

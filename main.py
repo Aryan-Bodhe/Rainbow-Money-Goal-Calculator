@@ -68,6 +68,9 @@ def run_test(
         risk_profile=sip_plan.risk_profile
     )
 
+
+    portfolio.convert_assets_to_inr()
+
     # 4) Compute per-asset expected returns (rolling SIP XIRR)
     portfolio.compute_asset_expected_returns(mode="median")
 

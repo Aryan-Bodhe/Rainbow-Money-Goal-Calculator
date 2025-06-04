@@ -128,3 +128,20 @@ class InvalidReturnCalculationModeError(Exception):
             f"Valid modes are: {valid_modes}."
         )
         super().__init__(message)
+
+
+# ---- CurrencyConverter.py ---- #
+
+class NavAlreadyInINRError(Exception):
+    def __init__(self):
+        message = (
+            "NAV Values Already in INR."
+        )
+        super().__init__(message)
+
+class DatesNotAlignedError(Exception):
+    def __init__(self):
+        message = (
+            f"Date columns of NAV_data and Forex do not match."
+        )
+        super().__init__(message)

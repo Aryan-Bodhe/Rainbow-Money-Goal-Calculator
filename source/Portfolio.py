@@ -57,6 +57,13 @@ class Portfolio:
         # For probability methods:
         self._composite_nav_df: pd.DataFrame | None = None
 
+    
+    def convert_assets_to_inr(self) -> None:
+        """
+        For each Asset, convert its nav values from whichever currency to INR.
+        """
+        for asset in self.assets:
+            asset.convert_navs_to_inr()
 
     def compute_asset_expected_returns(self, mode: str = "median") -> None:
         """
@@ -64,6 +71,8 @@ class Portfolio:
         and store in self.asset_returns.
         """
         for asset in self.assets:
+            # print(asset.name)
+            # print(asset._df)
             rate = asset.compute_expected_return(
                 time_horizon=self.time_horizon,
                 mode=mode
@@ -268,9 +277,9 @@ class Portfolio:
         """
         nav_dfs = []
         for asset in self.assets:
-            df = asset._df[['Date', 'NAV']].copy()
+            df = asset._df[['Date', 'NAV_INR']].copy()
             df.set_index('Date', inplace=True)
-            df.rename(columns={'NAV': asset.name}, inplace=True)
+            df.rename(columns={'NAV_INR': asset.name}, inplace=True)
             nav_dfs.append(df)
 
         combined = pd.concat(nav_dfs, axis=1).sort_index().ffill().bfill()
