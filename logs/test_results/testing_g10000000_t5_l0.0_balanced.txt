@@ -1,0 +1,26 @@
+
+----------- PORTFOLIO SUMMARY -----------
+Goal Amount       : ₹10,000,000.00
+Time Horizon      : 5 years
+Lumpsum Amount    : ₹0.00
+Total Monthly SIP : ₹128469.47
+Risk Profile      : Balanced
+Portfolio Growth  : 30.83%
+
+Asset Allocation & Expected Returns:
+  • Largecap   weight=0.40, exp_return=11.72%, SIP=₹51387.79
+  • S&p_500    weight=0.15, exp_return=13.77%, SIP=₹19270.42
+  • Debt       weight=0.30, exp_return=6.95%, SIP=₹38540.84
+  • Gold       weight=0.15, exp_return=9.05%, SIP=₹19270.42
+
+Asset-Level XIRRs:
+  • Largecap   XIRR = 12.37%
+  • S&p_500    XIRR = 14.67%
+  • Debt       XIRR = 7.17%
+  • Gold       XIRR = 9.43%
+
+Portfolio XIRR (combined): 10.80%
+------------------------------------------
+
+Probability of reaching ₹10,000,000 in 5 years: 53.84%
+Suggested total monthly SIP for 95% probability: ₹149,545.67

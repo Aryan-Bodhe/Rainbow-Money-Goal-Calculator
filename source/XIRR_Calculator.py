@@ -1,10 +1,11 @@
-# SIP_Return_Forecaster.py
+# XIRR_Calculator.py
 
 from __future__ import annotations
 import pandas as pd
 import pyxirr
 from typing import List, Literal
 from colorama import Fore
+from config import ENABLE_XIRR_DUMP
 
 from source.Exceptions import (
     HistoricalDataTooLowError, 
@@ -13,11 +14,11 @@ from source.Exceptions import (
     InvalidReturnCalculationModeError
 )
 
-class SIPReturnForecaster:
+class XirrCalculator:
     def __init__(self):
         pass
 
-    def _compute_rolling_sip_xirrs(
+    def _compute_rolling_window_xirrs(
         self, df: pd.DataFrame, time_horizon: int, sip_amount: float = 1000
     ) -> List[float]:
         """
@@ -49,15 +50,15 @@ class SIPReturnForecaster:
                 xirrs.append(xirr_val)
             except Exception as e:
                 raise XirrComputationFailedError(e)
-
+        
         return xirrs
 
-    def get_expected_sip_return_rate(
+    def compute_rolling_xirr(
         self,
         time_horizon: int,
         feather_path: str | None = None,
         df: pd.DataFrame | None = None,
-        mode: Literal["mean", "median", "optimistic", "pessimistic"] = "mean"
+        mode: Literal["mean", "median", "optimistic", "pessimistic"] = "median"
     ) -> float:
         """
         :param time_horizon: Investment horizon in years.
@@ -75,10 +76,13 @@ class SIPReturnForecaster:
         df['Date'] = pd.to_datetime(df['Date'])
         df = df.sort_values('Date').reset_index(drop=True)
 
-        xirrs = self._compute_rolling_sip_xirrs(df, time_horizon)
+        xirrs = self._compute_rolling_window_xirrs(df, time_horizon)
         if not xirrs:
             # raise ValueError(Fore.YELLOW + "[WARNING] Not enough data to compute returns." + Fore.RESET)
             raise HistoricalDataTooLowError('', '', '')
+        
+        if ENABLE_XIRR_DUMP:
+            print(xirrs)
 
         series = pd.Series(xirrs)
         if mode == "median":
@@ -90,8 +94,5 @@ class SIPReturnForecaster:
         elif mode == "optimistic":
             return round(series.quantile(0.75), 2)
         else:
-            # raise ValueError(
-            #     Fore.RED + f"[ERROR] Unknown mode '{mode}'. Choose from median/mean/pessimistic/optimistic." + Fore.RESET
-            # )
             raise InvalidReturnCalculationModeError(mode, ("median", "mean", "pessimistic", "optimistic"))
             

@@ -116,7 +116,9 @@ class CurrencyConverter:
         
         if currency == 'INR':
             return self.original_nav_data
+        # print('Converted')
         
+
         self._load_forex_data(currency)
 
         if not self._is_data_aligned():

@@ -9,6 +9,7 @@ from typing import Literal
 import numpy as np
 
 from source.Asset import Asset
+from source.XIRR_Calculator import XirrCalculator
 from source.Exceptions import (
     InvalidSipAmountError, 
     LumpsumEnoughToReachGoalError, 
@@ -53,11 +54,24 @@ class Portfolio:
         self.cumulative_investment: List[float] = []
         self.cumulative_returns: List[float] = []
         self.portfolio_xirr: float = 0.0
+        self.portfolio_forecasted_xirr: float = 0.0
 
         # For probability methods:
         self._composite_nav_df: pd.DataFrame | None = None
 
-    
+
+    def check_weights(self) -> None: 
+        weight_sum = 0
+        for asset in self.assets:
+            weight_sum += asset.weight
+
+        weight_sum = int(weight_sum + 1e-8) # add a correction factor for floating point precision error
+
+        if weight_sum != 1:
+            print(weight_sum)
+            raise ValueError('Portfolio asset weights do not sum to 1.')
+
+
     def convert_assets_to_inr(self) -> None:
         """
         For each Asset, convert its nav values from whichever currency to INR.
@@ -65,15 +79,14 @@ class Portfolio:
         for asset in self.assets:
             asset.convert_navs_to_inr()
 
-    def compute_asset_expected_returns(self, mode: str = "median") -> None:
+
+    def compute_asset_xirr(self, mode: Literal["mean", "median", "optimistic", "pessimistic"] = "median") -> None:
         """
         For each Asset, call compute_expected_return(time_horizon, mode)
         and store in self.asset_returns.
         """
         for asset in self.assets:
-            # print(asset.name)
-            # print(asset._df)
-            rate = asset.compute_expected_return(
+            rate = asset.compute_rolling_xirr(
                 time_horizon=self.time_horizon,
                 mode=mode
             )
@@ -104,100 +117,51 @@ class Portfolio:
         self.total_monthly_sip = round(sum(self.asset_sips.values()), 2)
 
 
-    def compute_asset_xirrs(self) -> None:
+    def build_portfolio_nav(self) -> pd.DataFrame:
         """
-        For each Asset:
-          - lumpsum_cf = –(self.lumpsum_amount * asset.weight)
-          - call asset.compute_asset_xirr(lumpsum_cf, self.start_date, self.total_months)
-          - store in self.asset_xirrs[asset.name]
+        Constructs a single portfolio NAV time series by taking a weighted sum
+        of each asset’s NAV_INR series in self._composite_nav_df.
+
+        Returns:
+            pd.DataFrame with columns ['Date', 'NAV_INR'], where each NAV_INR value
+            is sum(asset_NAV_INR * asset.weight) for that date.
+
+        Raises:
+            ValueError: if any asset.name is missing from self._composite_nav_df columns.
         """
-        for asset in self.assets:
-            lumpsum_cf = (self.lumpsum_amount * asset.weight)
-            try:
-                xirr_pct = asset.compute_asset_xirr(
-                    goal_amt=self.goal_amount,
-                    lumpsum_amt=lumpsum_cf,
-                    start_date=self.start_date,
-                    total_months=self.total_months
-                )
-                self.asset_xirrs[asset.name] = xirr_pct
-            except LumpsumEnoughToReachGoalError:
-                print("Lumpsum is good")
-                return
+        # 1) Ensure composite NAV is prepared
+        if self._composite_nav_df is None:
+            # raise ValueError("Composite NAV not prepared. Call prepare_composite_nav() first.")
+            self.prepare_composite_nav()
 
+        # 2) Build a dict of {asset_name: weight}
+        weights = {asset.name: asset.weight for asset in self.assets}
 
-    def compute_portfolio_xirr(self) -> float:
-        """
-        Aggregates forward‐looking cashflows (lumpsum + SIPs + redemption) for each asset:
-          - lumpsum at t0
-          - SIP each month for N months
-          - redemption at month N using each asset’s expected_return_rate
-        Calls pyxirr.xirr(...) on the combined cashflow dict and returns XIRR%.
-        """
-        combined_cfs: dict[datetime, float] = defaultdict(float)
-        N = self.total_months
-        t0 = pd.Timestamp(self.start_date.date())
+        # 3) Check that every asset name appears as a column in _composite_nav_df
+        missing = set(weights.keys()) - set(self._composite_nav_df.columns)
+        if missing:
+            raise ValueError(f"Missing NAV columns for assets: {missing}")
 
-        for asset in self.assets:
-            # print(asset.name)
-            # 1) Optional Lumpsum Outflow
-            lumpsum_cf = 0.0
-            sip_amt = asset.asset_sip_amount
+        # 4) Multiply each column by its weight, then sum across columns to get portfolio NAV
+        #    (self._composite_nav_df columns are asset names, each column = NAV_INR time series)
+        w_series = pd.Series(weights)
+        portfolio_nav_series = self._composite_nav_df.mul(w_series, axis=1).sum(axis=1)
 
-            if sip_amt < 0:
-                # raise ValueError(f"[ERROR] asset_sip_amount for '{asset.name}' is not set.")
-                raise InvalidSipAmountError(sip_amt)
+        # 5) Return a DataFrame with ['Date', 'NAV_INR']
+        portfolio_df = pd.DataFrame({
+            "Date": portfolio_nav_series.index,
+            "NAV_INR": portfolio_nav_series.values
+        }).reset_index(drop=True)
 
-            # if self.lumpsum_amount > 0:
-            lumpsum_cf = (self.lumpsum_amount * asset.weight)
-            combined_cfs[t0] += -(lumpsum_cf + sip_amt)
+        return portfolio_df
+    
 
-            # 2) SIP Outflows (Always happens if asset_sip_amount > 0)
-            # for m in range(1, N + 1):
-            for m in range(1, N):
-                sip_date = t0 + pd.DateOffset(months=m)
-                combined_cfs[sip_date] += -sip_amt
-
-            # 3) Redemption Inflow
-            r_monthly = (asset.expected_return_rate / 100) / 12
-
-            # Handle case where lumpsum_cf = 0
-            lumpsum_growth = (lumpsum_cf) * (1 + r_monthly) ** N 
-
-            # SIP future value (assumes SIPs occur at start of month, i.e. annuity due)
-            sip_growth = 0
-            if r_monthly != 0:
-                sip_growth = sip_amt * (((1 + r_monthly) ** N - 1) / r_monthly) * (1 + r_monthly)
-            elif r_monthly == 0:
-                sip_growth = sip_amt * N  # No interest case
-
-            # print(lumpsum_growth)
-            # print(sip_growth)
-            
-            final_value = lumpsum_growth + sip_growth
-            redemption_date = t0 + pd.DateOffset(months=N)
-            combined_cfs[redemption_date] += final_value
-
-        # Clean cashflows: remove zero-amount dates
-        cf_dict = {date: round(amount, 2) for date, amount in combined_cfs.items() if abs(amount) > 1e-8}
-
-        # Must have at least one negative and one positive cashflow
-        # if not any(v < 0 for v in cf_dict.values()) or not any(v > 0 for v in cf_dict.values()):
-        #     # raise ValueError("[ERROR] Cashflows must include at least one inflow and one outflow to compute XIRR.")
-        #     raise XirrComputationFailedError("")
-
-        try:
-            rate = pyxirr.xirr(cf_dict) * 100
-        except Exception as e:
-            # raise ValueError(f"[ERROR] Cannot compute portfolio XIRR: {e}")
-            raise XirrComputationFailedError(e)
-
-        self.portfolio_xirr = round(rate, 2)
-        # print('portfolio-level')
-        # print(cf_dict, len(cf_dict))
-
+    def compute_portfolio_rolling_xirr(self, mode: Literal["mean", "median", "optimistic", "pessimistic"] = "median") -> None:
+        portfolio_historical_value = self.build_portfolio_nav()
+        xirr_calc = XirrCalculator()
+        self.portfolio_xirr = xirr_calc.compute_rolling_xirr(self.time_horizon, df=portfolio_historical_value, mode=mode)
         return self.portfolio_xirr
-
+    
 
     def simulate_growth(self) -> None:
         """
@@ -265,8 +229,11 @@ class Portfolio:
         for name, xr in self.asset_xirrs.items():
             print(f"  • {name.capitalize():<10} XIRR = {xr:.2f}%")
 
-        print(f"\nPortfolio XIRR (combined): {self.portfolio_xirr:.2f}%")
+        print(f"\nPortfolio Forecasted XIRR : {self.portfolio_forecasted_xirr:.2f}%.")
+        print(f"Portfolio Rolling XIRR : {self.portfolio_xirr:0.2f}%.")
         print("------------------------------------------\n")
+
+
 
     # ── Probability / Suggested SIP Methods ─────────────────────────────────
 
@@ -303,14 +270,16 @@ class Portfolio:
         if self._composite_nav_df is None:
             self.prepare_composite_nav()
 
+        n_assets = len(self.assets)
+
         # 1) Compute historical monthly log‐returns for each asset
         log_returns = np.log(self._composite_nav_df / self._composite_nav_df.shift(1)).dropna()
         mu  = log_returns.mean().values      # shape: (n_assets,)
+        # mu = np.full(n_assets, np.log(1 + self.portfolio_xirr) / 12)
         cov = log_returns.cov().values        # shape: (n_assets, n_assets)
 
         weights = np.array([asset.weight for asset in self.assets])  # (n_assets,)
         months  = self.total_months
-        n_assets = len(self.assets)
 
         # 2) How much lumpsum goes into each asset at Month 1?
         lumpsum_per_asset = weights * lumpsum      # (n_assets,)
@@ -373,70 +342,102 @@ class Portfolio:
                 high = mid
 
         return round(high, 2)
-
-## ORIGINAL DO NOT TOUCH
-    # def probability_of_reaching_goal(self, monthly_sip: float, num_simulations: int = 10000) -> float:
-    #     """
-    #     Estimates probability of achieving goal amount at end of horizon with given monthly SIP
-    #     using Monte Carlo simulation on historical monthly log returns of composite NAV.
-
-    #     Returns probability (0.0 to 1.0).
-    #     """
-    #     if self._composite_nav_df is None:
-    #         self.prepare_composite_nav()
-
-    #     # Compute monthly log returns
-    #     log_returns = np.log(self._composite_nav_df / self._composite_nav_df.shift(1)).dropna()
-
-    #     mu = log_returns.mean().values           # mean returns vector
-    #     cov = log_returns.cov().values            # covariance matrix
-
-    #     weights = np.array([asset.weight for asset in self.assets])
-    #     months = self.total_months
-
-    #     sip_per_asset = weights * monthly_sip
-
-    #     # Start asset values per simulation = 0 (invested value)
-    #     values = np.zeros((num_simulations, len(self.assets)))
-
-    #     # Cholesky decomposition for correlated returns
-    #     L = np.linalg.cholesky(cov)
-
-    #     for _ in range(months):
-    #         rand_normals = np.random.randn(num_simulations, len(self.assets))
-    #         correlated_returns = rand_normals @ L.T + mu
-
-    #         # Add monthly SIP first
-    #         values += sip_per_asset
-
-    #         # Apply returns
-    #         values = values * np.exp(correlated_returns)
-
-    #     # Final portfolio values per simulation (sum across assets)
-    #     portfolio_values = values.sum(axis=1)
-
-    #     # print(portfolio_values)
-
-    #     # Probability of reaching or exceeding goal
-    #     prob = np.mean(portfolio_values >= self.goal_amount)
-    #     # print(prob)
-    #     return prob
-    #     # prob_calc = SipProbabilityCalculator()
+    
 
 
-    # def suggest_sip_for_probability(self, target_prob: float = 0.95, num_simulations: int = 10000) -> float:
-    #     """
-    #     Uses binary search to find the monthly SIP amount required to achieve
-    #     the target probability of hitting the goal amount at the end of horizon.
-    #     """
-    #     low, high = 0, self.goal_amount  # upper bound guess
+    # ── Forecasted Return Rate Methods ─────────────────────────────────
 
-    #     for _ in range(20):
-    #         mid = (low + high) / 2
-    #         prob = self.probability_of_reaching_goal(monthly_sip=mid, num_simulations=num_simulations)
-    #         if prob < target_prob:
-    #             low = mid
-    #         else:
-    #             high = mid
+    def compute_forecasted_asset_xirrs(self) -> None:
+        """
+        For each Asset:
+          - lumpsum_cf = –(self.lumpsum_amount * asset.weight)
+          - call asset.compute_asset_xirr(lumpsum_cf, self.start_date, self.total_months)
+          - store in self.asset_xirrs[asset.name]
+        """
+        for asset in self.assets:
+            lumpsum_cf = (self.lumpsum_amount * asset.weight)
+            try:
+                xirr_pct = asset.compute_asset_xirr(
+                    goal_amt=self.goal_amount,
+                    lumpsum_amt=lumpsum_cf,
+                    start_date=self.start_date,
+                    total_months=self.total_months
+                )
+                self.asset_xirrs[asset.name] = xirr_pct
+            except LumpsumEnoughToReachGoalError:
+                print("Lumpsum is good")
+                return
 
-    #     return round(high, 2)
+
+    def compute_forecasted_portfolio_xirr(self) -> float:
+        """
+        Aggregates forward‐looking cashflows (lumpsum + SIPs + redemption) for each asset:
+          - lumpsum at t0
+          - SIP each month for N months
+          - redemption at month N using each asset’s expected_return_rate
+        Calls pyxirr.xirr(...) on the combined cashflow dict and returns XIRR%.
+        """
+        combined_cfs: dict[datetime, float] = defaultdict(float)
+        N = self.total_months
+        t0 = pd.Timestamp(self.start_date.date())
+
+        for asset in self.assets:
+            # print(asset.name)
+            # 1) Optional Lumpsum Outflow
+            lumpsum_cf = 0.0
+            sip_amt = asset.asset_sip_amount
+
+            if sip_amt < 0:
+                # raise ValueError(f"[ERROR] asset_sip_amount for '{asset.name}' is not set.")
+                raise InvalidSipAmountError(sip_amt)
+
+            # if self.lumpsum_amount > 0:
+            lumpsum_cf = (self.lumpsum_amount * asset.weight)
+            combined_cfs[t0] += -(lumpsum_cf + sip_amt)
+
+            # 2) SIP Outflows (Always happens if asset_sip_amount > 0)
+            # for m in range(1, N + 1):
+            for m in range(1, N):
+                sip_date = t0 + pd.DateOffset(months=m)
+                combined_cfs[sip_date] += -sip_amt
+
+            # 3) Redemption Inflow
+            r_monthly = (asset.expected_return_rate / 100) / 12
+
+            # Handle case where lumpsum_cf = 0
+            lumpsum_growth = (lumpsum_cf) * (1 + r_monthly) ** N 
+
+            # SIP future value (assumes SIPs occur at start of month, i.e. annuity due)
+            sip_growth = 0
+            if r_monthly != 0:
+                sip_growth = sip_amt * (((1 + r_monthly) ** N - 1) / r_monthly) * (1 + r_monthly)
+            elif r_monthly == 0:
+                sip_growth = sip_amt * N  # No interest case
+
+            # print(lumpsum_growth)
+            # print(sip_growth)
+            
+            final_value = lumpsum_growth + sip_growth
+            redemption_date = t0 + pd.DateOffset(months=N)
+            combined_cfs[redemption_date] += final_value
+
+        # Clean cashflows: remove zero-amount dates
+        cf_dict = {date: round(amount, 2) for date, amount in combined_cfs.items() if abs(amount) > 1e-8}
+
+        # Must have at least one negative and one positive cashflow
+        # if not any(v < 0 for v in cf_dict.values()) or not any(v > 0 for v in cf_dict.values()):
+        #     # raise ValueError("[ERROR] Cashflows must include at least one inflow and one outflow to compute XIRR.")
+        #     raise XirrComputationFailedError("")
+
+        try:
+            rate = pyxirr.xirr(cf_dict) * 100
+        except Exception as e:
+            # raise ValueError(f"[ERROR] Cannot compute portfolio XIRR: {e}")
+            raise XirrComputationFailedError(e)
+
+        self.portfolio_forecasted_xirr = round(rate, 2)
+        # print('portfolio-level')
+        # print(cf_dict, len(cf_dict))
+
+        return self.portfolio_forecasted_xirr
+

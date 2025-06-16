@@ -4,7 +4,7 @@ import pandas as pd
 from datetime import datetime
 import pyxirr
 
-from source.SIP_Return_Forecaster import SIPReturnForecaster
+from source.XIRR_Calculator import XirrCalculator
 from source.Currency_Converter import CurrencyConverter
 from source.Exceptions import (
     InvalidStartDateError,
@@ -32,7 +32,7 @@ class Asset:
     ):
         """
         :param name: Asset name (e.g., "smallcap").
-        :param feather_path: Path to that asset’s historical price (Feather format).
+        :param feather_path: Path to that asset's historical price (Feather format).
         :param weight: Fraction of total portfolio allocated to this asset (must sum to 1).
         :param is_sip_start_of_month: If True, SIP is at month-start; otherwise month-end.
         """
@@ -68,21 +68,21 @@ class Asset:
         self._df = df
 
             
-    def compute_expected_return(
+    def compute_rolling_xirr(
         self,
         time_horizon: int,
         mode: str = "median"
     ) -> float:
         """
-        Uses SIPReturnForecaster to compute rolling‐window SIP XIRR (median/mean/etc.)
-        on this asset’s history. Stores result in self.expected_return_rate.
+        Uses SIPReturnForecaster to compute rolling-window SIP XIRR (median/mean/etc.)
+        on this asset's history. Stores result in self.expected_return_rate.
         """
         if self._df is None:
             self.load_history()
 
-        forecaster = SIPReturnForecaster()
+        xirr_calc = XirrCalculator()
 
-        expected = forecaster.get_expected_sip_return_rate(
+        expected = xirr_calc.compute_rolling_xirr(
             time_horizon=time_horizon,
             df=self._df,
             mode=mode
@@ -119,8 +119,9 @@ class Asset:
         self.asset_sip_amount = max(0, round(sip_amt, 2)) # default to zero if sip < 0 => no sip needed
         return self.asset_sip_amount
 
+    # ── Forecasted Return Rate Methods ─────────────────────────────────
 
-    def compute_asset_xirr(
+    def compute_forecasted_asset_xirr(
         self,
         goal_amt: float,
         lumpsum_amt: float = 0.0,   # default optional parameter
