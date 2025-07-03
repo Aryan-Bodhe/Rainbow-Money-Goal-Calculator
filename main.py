@@ -133,6 +133,7 @@ def main():
     # default test
     # goal = 1cr, time = 10, lumpsum = 0, risk = conservative
     # run_test()
+    os.system('clear')
 
     # -------------- Single Parameter Testing ---------------- #
 

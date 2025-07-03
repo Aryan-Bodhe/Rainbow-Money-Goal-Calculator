@@ -3,20 +3,20 @@
 Goal Amount       : ₹10,000,000.00
 Time Horizon      : 3 years
 Lumpsum Amount    : ₹0.00
-Total Monthly SIP : ₹235756.49
+Total Monthly SIP : ₹235965.24
 Risk Profile      : Conservative
-Portfolio Growth  : 18.90%
+Portfolio Growth  : 18.79%
 
 Asset Allocation & Expected Returns:
-  • Largecap   weight=0.20, exp_return=12.99%, SIP=₹47151.30
-  • S&p_500    weight=0.10, exp_return=12.94%, SIP=₹23575.65
-  • Gold       weight=0.70, exp_return=10.14%, SIP=₹165029.54
+  • Largecap   weight=0.20, exp_return=12.82%, SIP=₹47193.05
+  • S&p_500    weight=0.10, exp_return=12.70%, SIP=₹23596.52
+  • Gold       weight=0.70, exp_return=10.14%, SIP=₹165175.67
 
 Asset-Level XIRRs:
 
-Portfolio Forecasted XIRR : 11.57%.
-Portfolio Rolling XIRR : 10.50%.
+Portfolio Forecasted XIRR : 11.50%.
+Portfolio Rolling XIRR : 10.35%.
 ------------------------------------------
 
-Probability of reaching ₹10,000,000 in 3 years: 58.08%
-Suggested total monthly SIP for 95% probability: ₹282,592.77
+Probability of reaching ₹10,000,000 in 3 years: 57.70%
+Suggested total monthly SIP for 95% probability: ₹283,689.50
