@@ -10,7 +10,7 @@ from matplotlib.ticker import (
     FuncFormatter
 )
 
-from source.Portfolio import Portfolio
+from core.portfolio import Portfolio
 
 class SipPlotter:
     """

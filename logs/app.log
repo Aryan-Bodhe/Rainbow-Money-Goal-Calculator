@@ -1,0 +1,60 @@
+2025-07-15 22:24:46 | INFO     | ---------- New Request Received ----------
+2025-07-15 22:24:46 | INFO     | Starting run_analysis
+2025-07-15 22:24:46 | INFO     | SIP plan initialized
+2025-07-15 22:24:46 | INFO     | Assets loaded
+2025-07-15 22:24:46 | INFO     | Portfolio constructed
+2025-07-15 22:24:47 | INFO     | Computed XIRRs and allocations
+2025-07-15 22:24:47 | INFO     | Simulated portfolio growth
+2025-07-15 22:24:47 | INFO     | Computed Goal Achievement Probability and Suggested SIP.
+2025-07-15 22:24:47 | INFO     | Portfolio summary generated
+2025-07-15 22:24:47 | INFO     | Total Test Runtime:  1.576 s.
+2025-07-15 22:24:47 | INFO     | Peak memory usage: 1.685 MB
+2025-07-15 22:24:47 | INFO     | Goal Calculation Completed Successfully.
+2025-07-15 22:24:47 | INFO     | ------------------------------------------
+2025-07-15 22:25:08 | INFO     | ---------- New Request Received ----------
+2025-07-15 22:25:08 | INFO     | Starting run_analysis
+2025-07-15 22:25:08 | INFO     | SIP plan initialized
+2025-07-15 22:25:08 | INFO     | Assets loaded
+2025-07-15 22:25:08 | INFO     | Portfolio constructed
+2025-07-15 22:25:09 | INFO     | Computed XIRRs and allocations
+2025-07-15 22:25:09 | INFO     | Simulated portfolio growth
+2025-07-15 22:25:09 | INFO     | Computed Goal Achievement Probability and Suggested SIP.
+2025-07-15 22:25:09 | INFO     | Portfolio summary generated
+2025-07-15 22:25:09 | INFO     | Total Test Runtime:  1.446 s.
+2025-07-15 22:25:09 | INFO     | Peak memory usage: 1.375 MB
+2025-07-15 22:25:09 | INFO     | Goal Calculation Completed Successfully.
+2025-07-15 22:25:09 | INFO     | ------------------------------------------
+2025-07-15 22:25:28 | INFO     | ---------- New Request Received ----------
+2025-07-15 22:25:28 | INFO     | Starting run_analysis
+2025-07-15 22:25:28 | ERROR    | Failed to initialize SIP plan
+Traceback (most recent call last):
+  File "/home/aryan-bodhe/Desktop/Rainbow Money/Goal Calculator/core/goal_engine.py", line 36, in run_analysis
+    sip_plan.set_testing_data(
+  File "/home/aryan-bodhe/Desktop/Rainbow Money/Goal Calculator/core/sip_goal_based.py", line 52, in set_testing_data
+    raise InvalidLumpsumAmountError(lumpsum)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: InvalidLumpsumAmountError.__init__() missing 1 required positional argument: 'goal_amount'
+2025-07-15 22:25:28 | ERROR    | Unexpected error during goal calculation.
+Traceback (most recent call last):
+  File "/home/aryan-bodhe/Desktop/Rainbow Money/Goal Calculator/main.py", line 39, in calculate_goal
+    result = run_analysis(
+             ^^^^^^^^^^^^^
+  File "/home/aryan-bodhe/Desktop/Rainbow Money/Goal Calculator/core/goal_engine.py", line 36, in run_analysis
+    sip_plan.set_testing_data(
+  File "/home/aryan-bodhe/Desktop/Rainbow Money/Goal Calculator/core/sip_goal_based.py", line 52, in set_testing_data
+    raise InvalidLumpsumAmountError(lumpsum)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: InvalidLumpsumAmountError.__init__() missing 1 required positional argument: 'goal_amount'
+2025-07-15 22:25:45 | INFO     | ---------- New Request Received ----------
+2025-07-15 22:25:45 | INFO     | Starting run_analysis
+2025-07-15 22:25:45 | INFO     | SIP plan initialized
+2025-07-15 22:25:45 | INFO     | Assets loaded
+2025-07-15 22:25:46 | INFO     | Portfolio constructed
+2025-07-15 22:25:46 | INFO     | Computed XIRRs and allocations
+2025-07-15 22:25:46 | INFO     | Simulated portfolio growth
+2025-07-15 22:25:47 | INFO     | Computed Goal Achievement Probability and Suggested SIP.
+2025-07-15 22:25:47 | INFO     | Portfolio summary generated
+2025-07-15 22:25:47 | INFO     | Total Test Runtime:  1.422 s.
+2025-07-15 22:25:47 | INFO     | Peak memory usage: 1.419 MB
+2025-07-15 22:25:47 | INFO     | Goal Calculation Completed Successfully.
+2025-07-15 22:25:47 | INFO     | ------------------------------------------

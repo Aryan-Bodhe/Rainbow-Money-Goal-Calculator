@@ -1,12 +1,10 @@
-# source/Asset.py
-
 import pandas as pd
 from datetime import datetime
 import pyxirr
 
-from source.XIRR_Calculator import XirrCalculator
-from source.Currency_Converter import CurrencyConverter
-from source.Exceptions import (
+from core.xirr_calculator import XirrCalculator
+from core.currency_converter import CurrencyConverter
+from core.exceptions import (
     InvalidStartDateError,
     LumpsumEnoughToReachGoalError, 
     InvalidTimeHorizonError, 
@@ -46,28 +44,27 @@ class Asset:
         self.asset_xirr: float = 0.0             # XIRR % computed for this asset
         self._df: pd.DataFrame | None = None     # loaded historical DataFrame
 
-
     def convert_navs_to_inr(self) -> None:
         """
-        Converts the NAV of the historical data to inr using date-matched conversion rates.
+        Converts the NAV of the historical data to INR using date-matched conversion rates.
         """
         curr_conv = CurrencyConverter()
         if self._df is None:
             self.load_history()
 
+        # Assumes date-aligned FX rates exist for all NAV dates
         self._df = curr_conv.convert_to_inr(nav_data=self._df)
-            
 
     def load_history(self) -> None:
         """
         Reads the Feather file into self._df, normalizes dates to midnight, and sorts.
+        Expects the Feather file to contain a 'Date' column.
         """
         df = pd.read_feather(self.feather_path)
         df['Date'] = pd.to_datetime(df['Date']).dt.normalize()
         df = df.sort_values('Date').reset_index(drop=True)
         self._df = df
 
-            
     def compute_rolling_xirr(
         self,
         time_horizon: int,
@@ -76,6 +73,10 @@ class Asset:
         """
         Uses SIPReturnForecaster to compute rolling-window SIP XIRR (median/mean/etc.)
         on this asset's history. Stores result in self.expected_return_rate.
+
+        :param time_horizon: Number of years for the rolling XIRR window.
+        :param mode: Aggregation mode over rolling windows ('median', 'mean', etc.)
+        :return: Estimated annual return rate (%)
         """
         if self._df is None:
             self.load_history()
@@ -90,7 +91,6 @@ class Asset:
         self.expected_return_rate = expected
         return expected
 
-
     def compute_monthly_sip_for_asset(
         self,
         total_FV: float,
@@ -99,55 +99,48 @@ class Asset:
         monthly_rate: float
     ) -> float:
         """
-        Applies your ordinary annuity SIP formula for this asset:
+        Applies ordinary annuity SIP formula for this asset:
             sip = ((FV - L*(1+r)^n) / (((1+r)^n - 1)/r)) * weight
 
         :param total_FV: The overall portfolio goal (₹).
         :param lumpsum_amount: The overall lumpsum (₹).
-        :param total_months: time_horizon * 12.
-        :param monthly_rate: annual_expected/12/100 (decimal).
+        :param total_months: Time horizon in months (years * 12).
+        :param monthly_rate: Monthly rate of return as decimal (annual / 12 / 100).
         :return: ₹ per-month SIP for this asset (rounded).
         """
         numerator = total_FV - lumpsum_amount * (1 + monthly_rate) ** total_months
         denominator = ((1 + monthly_rate) ** total_months - 1) / monthly_rate
         sip_amt = (numerator / denominator) * self.weight
 
-        # if sip_amt < 0:
-        #     self.asset_sip_amount = 0
-        #     raise LumpsumEnoughToReachGoalError(lumpsum_amount, goal_amount=goal_amt)
-        
-        self.asset_sip_amount = max(0, round(sip_amt, 2)) # default to zero if sip < 0 => no sip needed
+        # SIP should not be negative. If it is, default to 0.
+        self.asset_sip_amount = max(0, round(sip_amt, 2))
         return self.asset_sip_amount
-
-    # ── Forecasted Return Rate Methods ─────────────────────────────────
 
     def compute_forecasted_asset_xirr(
         self,
         goal_amt: float,
-        lumpsum_amt: float = 0.0,   # default optional parameter
+        lumpsum_amt: float = 0.0,
         start_date: datetime = None,
         total_months: int = 0,
     ) -> float:
         """
-        Builds a forward-looking cashflow dictionary using expected_return_rate (no future price lookup),
-        then calls pyxirr.xirr(...) to get XIRR%. Stores result in self.asset_xirr.
+        Builds a forward-looking cashflow dictionary using expected_return_rate
+        (no future price lookup), then computes XIRR using pyxirr.
 
-        :param lumpsum_amt: -(L * weight) at t0. Optional, default 0 (no lumpsum).
-        :param start_date:       date of lumpsum (datetime).
-        :param total_months:     time_horizon * 12.
-        :return:                 XIRR % for this asset (rounded).
+        :param goal_amt: Target amount to reach (₹).
+        :param lumpsum_amt: Lumpsum investment at start (₹). Default is 0.
+        :param start_date: Start date of investment.
+        :param total_months: Investment duration in months.
+        :return: Asset XIRR (%) rounded to 2 decimal places.
         """
         if self.expected_return_rate <= 0:
-            # raise ValueError(f"[ERROR] expected_return_rate for '{self.name}' is not set.")
             raise InvalidReturnRateError(self.expected_return_rate)
 
         if start_date is None:
-            # raise ValueError(f"[ERROR] start_date must be provided.")
             raise InvalidStartDateError(start_date)
 
         if total_months <= 0:
-            # raise ValueError(f"[ERROR] total_months must be greater than 0.")
-            InvalidTimeHorizonError(total_months / 12)
+            raise InvalidTimeHorizonError(total_months / 12)
 
         r_annual = self.expected_return_rate / 100
         r_monthly = r_annual / 12
@@ -155,8 +148,8 @@ class Asset:
 
         sip_amt = self.asset_sip_amount
 
-        # Compute final value using closed‐form lump + SIP formula:
-        lumpsum_growth = (lumpsum_amt) * (1 + r_monthly) ** N
+        # Compute final value from both lumpsum and SIP growth
+        lumpsum_growth = lumpsum_amt * (1 + r_monthly) ** N
         sip_growth = 0
 
         if lumpsum_growth > goal_amt:
@@ -165,38 +158,28 @@ class Asset:
 
         if r_monthly != 0:
             sip_growth = sip_amt * (((1 + r_monthly) ** N - 1) / r_monthly) * (1 + r_monthly)
-        elif r_monthly == 0:
+        else:
             sip_growth = sip_amt * N  # No interest case
 
         final_value = lumpsum_growth + sip_growth
-        # print(lumpsum_growth)
-        # print(sip_growth)
 
-        # Build cashflow dict with date keys at exact months:
+        # Build date-wise cashflow dictionary
         cf_dict: dict[datetime, float] = {}
         t0 = pd.Timestamp(start_date.date())
 
-        # print("First month: ", round(lumpsum_amt + sip_amt, 2))
-
-        # Add lumpsum_amt only if non-zero:
-        # if lumpsum_amt != 0:
-        cf_dict[t0] = -round(lumpsum_amt + sip_amt, 2) # negative at t0
+        cf_dict[t0] = -round(lumpsum_amt + sip_amt, 2)  # Initial outflow
 
         for m in range(1, N):
             sip_date = t0 + pd.DateOffset(months=m)
             cf_dict[sip_date] = -round(sip_amt, 2)
 
         redemption_date = t0 + pd.DateOffset(months=N)
-        cf_dict[redemption_date] = round(final_value, 2)  # positive
-        # print(cf_dict, len(cf_dict))
-
+        cf_dict[redemption_date] = round(final_value, 2)  # Final inflow
 
         try:
             rate = pyxirr.xirr(cf_dict) * 100
         except Exception as e:
-            # raise ValueError(f"[ERROR] Cannot compute XIRR for '{self.name}': {e}")
             raise XirrComputationFailedError(e)
 
         self.asset_xirr = round(rate, 2)
-
         return self.asset_xirr
