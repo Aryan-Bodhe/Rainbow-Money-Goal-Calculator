@@ -14,9 +14,9 @@ Asset Allocation & Expected Returns:
 
 Asset-Level XIRRs:
 
-Portfolio Forecasted XIRR : 15.15%.
+Portfolio Forecasted XIRR : 15.18%.
 Portfolio Rolling XIRR : 11.83%.
 ------------------------------------------
 
-Probability of reaching ₹10,000,000 in 1 years: 52.10%
-Suggested total monthly SIP for 95% probability: ₹878,763.20
+Probability of reaching ₹10,000,000 in 1 years: 53.26%
+Suggested total monthly SIP for 95% probability: ₹878,915.79

@@ -10,6 +10,8 @@ import numpy as np
 
 from source.Asset import Asset
 from source.XIRR_Calculator import XirrCalculator
+from models.asset import AssetSummary
+from models.portfolio import PortfolioSummary
 from source.Exceptions import (
     InvalidSipAmountError, 
     LumpsumEnoughToReachGoalError, 
@@ -58,6 +60,8 @@ class Portfolio:
 
         # For probability methods:
         self._composite_nav_df: pd.DataFrame | None = None
+        self.goal_achievement_probability = 0.0
+        self.suggested_sip = 0.0
 
 
     def check_weights(self) -> None: 
@@ -91,6 +95,7 @@ class Portfolio:
                 mode=mode
             )
             self.asset_returns[asset.name] = rate
+
 
 
     def compute_per_asset_sips(self) -> None:
@@ -201,6 +206,45 @@ class Portfolio:
             for tv, inv in zip(total_value, investment)
         ]
 
+    
+    def get_portfolio_summary(self) -> PortfolioSummary:
+        asset_summaries = []
+
+        for asset in self.assets:
+            asset_summaries.append(
+                AssetSummary(
+                    name=asset.name,
+                    weight=asset.weight,
+                    expected_return=self.asset_returns.get(asset.name, 0.0),
+                    sip_amount=self.asset_sips.get(asset.name, 0.0),
+                    xirr=self.asset_returns.get(asset.name)
+                )
+            )
+
+        if self.cumulative_returns and self.cumulative_investment and self.cumulative_investment[-1] != 0:
+            growth = self.cumulative_returns[-1] / self.cumulative_investment[-1] * 100
+
+        return PortfolioSummary(
+            goal_amount=self.goal_amount,
+            time_horizon=self.time_horizon,
+            lumpsum_amount=self.lumpsum_amount,
+            total_monthly_sip=(
+                round(self.total_monthly_sip, 2)
+                if self.total_monthly_sip > 0
+                else "SIP not required. Lumpsum enough to reach Goal."
+            ),
+            risk_profile=self.risk_profile.capitalize(),
+            portfolio_growth=round(growth, 2),
+            asset_summaries=asset_summaries,
+            rolling_xirr=round(self.portfolio_xirr, 2),
+            goal_achievement_probability=round(self.goal_achievement_probability*100, 2),
+            suggested_sip=(
+                round(self.suggested_sip, 2)
+                if self.suggested_sip > 1000
+                else "No additional SIP required."
+            )
+        )
+
 
     def display_summary(self) -> None:
         """
@@ -231,6 +275,8 @@ class Portfolio:
 
         print(f"\nPortfolio Forecasted XIRR : {self.portfolio_forecasted_xirr:.2f}%.")
         print(f"Portfolio Rolling XIRR : {self.portfolio_xirr:0.2f}%.")
+        print(f"Probability of reaching ₹{self.goal_amount:,.0f} in {self.time_horizon} years: {self.goal_achievement_probability*100:.2f}%")
+        print(f"Suggested total monthly SIP for 95% probability: ₹{self.suggested_sip:,.2f}")
         print("------------------------------------------\n")
 
 
@@ -314,7 +360,9 @@ class Portfolio:
         portfolio_values = values.sum(axis=1)  # (num_simulations,)
 
         # 8) Probability of hitting or exceeding goal_amount
-        return float(np.mean(portfolio_values >= self.goal_amount))
+        prob = float(np.mean(portfolio_values >= self.goal_amount))
+        self.goal_achievement_probability = prob
+        return prob
 
 
     def suggest_sip_for_probability(
@@ -340,8 +388,9 @@ class Portfolio:
                 low = mid
             else:
                 high = mid
-
-        return round(high, 2)
+        sugg_sip = round(high, 2)
+        self.suggested_sip = sugg_sip
+        return sugg_sip
     
 
 
@@ -357,7 +406,7 @@ class Portfolio:
         for asset in self.assets:
             lumpsum_cf = (self.lumpsum_amount * asset.weight)
             try:
-                xirr_pct = asset.compute_asset_xirr(
+                xirr_pct = asset.compute_forecasted_asset_xirr(
                     goal_amt=self.goal_amount,
                     lumpsum_amt=lumpsum_cf,
                     start_date=self.start_date,

@@ -1,139 +1,217 @@
 # main.py
-import sys
-from datetime import datetime
 import os
+from datetime import datetime
 from typing import Literal
+from fastapi import FastAPI, HTTPException
+import json
 
+from logger import get_logger
 from source.SIP_Goal_Based import SipGoalBased
 from source.Asset import Asset
 from source.Portfolio import Portfolio
 from source.SIP_Plotter import SipPlotter
 from config import *
 from source.Exceptions import DataFileNotFoundError
+from models.goal_request import GoalRequest
+from models.portfolio import PortfolioSummary
 
 import time as tm
 import tracemalloc
 
-test_id = 1
+app = FastAPI()
 
-def run_test(
-        goal_amount: float = 10_000_000,
-        time_horizon: int = 10,
-        lumpsum: float = 0.0,
-        risk_profile: Literal['conservative', 'balanced', 'aggressive'] = 'conservative'
-    ):
+@app.post("/calculate-goal")
+def calculate_goal(req: GoalRequest):
+    logger = get_logger()
+    logger.info('---------- New Request Received ----------')
+    try:
+        start = tm.time()
+        tracemalloc.start()
+        result = run_analysis(
+            goal_amount=req.goal_amount,
+            time_horizon=req.time_horizon,
+            lumpsum=req.lumpsum_amount,
+            risk_profile=req.risk_profile
+        ).model_dump_json()
+        _, peak = tracemalloc.get_traced_memory()
+        tracemalloc.stop()
+        end = tm.time()
+        
+        logger.info(f"Total Test Runtime: {end - start : 0.3f} s.")
+        logger.info(f"Peak memory usage: {peak / 10**6:.3f} MB")
+        logger.info('Goal Calculation Completed Successfully.')
+        logger.info('------------------------------------------')
+        return result
+    except DataFileNotFoundError as e:
+        logger.exception("Unexpected error during goal calculation.")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error("Unexpected error during goal calculation.")
+        raise HTTPException(status_code=500, detail="Internal error")
     
-    if ENABLE_LOGGING:
-        testname = f'{LOGGING_PATH}testing_g{str(goal_amount)}_t{str(time_horizon)}_l{str(lumpsum)}_{str(risk_profile)}'
-        sys.stdout = open(testname+'.txt', 'w')
-
-    # 1) Collect or set SIP inputs
-    sip_plan = SipGoalBased()
-
-    # If you want interactive input, uncomment:
-    # sip_plan.input_sip_data()
-
-    # For testing purposes:
-    sip_plan.set_testing_data(
-        goal=goal_amount,        
-        time_horizon=time_horizon, 
-        lumpsum=lumpsum,         
-        risk_profile=risk_profile  
-    )
-    # sip_plan.display_sip_data()
-
-    # 2) Build Asset instances from sip_plan.asset_weights
-    assets = []
-    for name, weight in sip_plan.asset_weights.items():
-        if weight != 0:
-            feather_path = ASSET_NAV_DATA_PATH.get(name)
-            if not feather_path or not os.path.exists(feather_path):
-                # raise FileNotFoundError(f"No Feather file found for asset '{name}': {feather_path}")
-                raise DataFileNotFoundError(name, feather_path)
-
-            assets.append(
-                Asset(
-                    name=name,
-                    feather_path=feather_path,
-                    weight=weight,
-                    is_sip_start_of_month=True
-                )
-            )
-
-    # 3) Create the Portfolio
-    portfolio = Portfolio(
-        goal_amount=sip_plan.goal_amount,
-        time_horizon=sip_plan.time_horizon,
-        lumpsum_amount=sip_plan.lumpsum_amount,
-        assets=assets,
-        start_date=datetime.today(),
-        risk_profile=sip_plan.risk_profile
-    )
-
-    portfolio.check_weights()
-
-    portfolio.convert_assets_to_inr()
-
-    # 4) Compute per-asset expected returns (rolling SIP XIRR)
-    portfolio.compute_asset_xirr(mode='mean')
-
-    # 5) Compute per-asset SIP allocations & total SIP
-    portfolio.compute_per_asset_sips()
-    # print(f"Total Monthly SIP across all assets: ₹{portfolio.total_monthly_sip:,.2f}")
-
-    # Compute rolling returns of portfolio's combined weighted historical data
-    if ENABLE_XIRR_DUMP:
-        print('Portfolio xirrs')
-    portfolio.compute_portfolio_rolling_xirr(mode='mean')
-
-    # 7) Compute portfolio‐level forward‐looking XIRR
-    portfolio.compute_forecasted_portfolio_xirr()
-    # print(f"Portfolio XIRR (combined): {overall_xirr:.2f}%")
-
-    # 8) Simulate month‐by‐month growth (investment vs returns)
-    portfolio.simulate_growth()
-    # print(f'Portfolio Growth : {(total_value[-1]/investment[-1] - 1)*100:0.2f}%.')
-
-    # 9) Display summary 
-    portfolio.display_summary()
-
-    # # 10) Create returns plot and save
-    if CREATE_HISTOGRAM:
-        plotter = SipPlotter()
-        plotter.plot_returns(portfolio)
-
-    # # 11) Estimate probability of reaching the goal with current SIP
-    prob = portfolio.probability_of_reaching_goal(
-        monthly_sip=portfolio.total_monthly_sip, 
-        num_simulations=NUM_SIMULATIONS, 
-        lumpsum=portfolio.lumpsum_amount
-    )
-
-    # # 12) Suggest a new SIP for 95% probability
-    suggested_sip = portfolio.suggest_sip_for_probability(
-        target_prob=TARGET_PROB_OF_SUCCESS,
-        num_simulations=NUM_SIMULATIONS,
-        lumpsum=portfolio.lumpsum_amount
-    )
-
-    print(f"Probability of reaching ₹{portfolio.goal_amount:,.0f} in {portfolio.time_horizon} years: {prob*100:.2f}%")
-    print(f"Suggested total monthly SIP for 95% probability: ₹{suggested_sip:,.2f}")
-
-    if ENABLE_LOGGING:
-        sys.stdout = sys.__stdout__
-        global test_id
-        print(f'Test {test_id} analysis complete. Output: {testname}.')
-        if ENABLE_LOGGING:
-            print(f'Test {test_id} simulation complete. Histogram: {HISTOGRAM_PATH}.')
-        print()
-        test_id += 1
-
-
 def main():
-    # default test
-    # goal = 1cr, time = 10, lumpsum = 0, risk = conservative
-    # run_test()
     os.system('clear')
+    
+    # tracemalloc.start()
+
+    result = calculate_goal(
+        GoalRequest(
+            goal_amount=1_000_000,
+            time_horizon=5,
+            lumpsum_amount=750_000,
+            risk_profile='balanced'
+        )
+    )
+
+    # with open('temp.json', 'w') as f:
+    #     json.dump(json.loads(result), f, indent=2)
+
+def run_analysis(
+    goal_amount: float,
+    time_horizon: int,
+    lumpsum: float,
+    risk_profile: Literal['conservative','balanced','aggressive']
+) -> PortfolioSummary:
+    
+    logger = get_logger()
+    logger.info("Starting run_analysis")
+
+    # 1) Build SIP plan
+    try:
+        sip_plan = SipGoalBased()
+        sip_plan.set_testing_data(
+            goal=goal_amount,
+            time_horizon=time_horizon,
+            lumpsum=lumpsum,
+            risk_profile=risk_profile
+        )
+        logger.info("SIP plan initialized")
+    except Exception:
+        logger.exception("Failed to initialize SIP plan")
+        raise
+
+    # 2) Load assets
+    try:
+        assets = []
+        for name, weight in sip_plan.asset_weights.items():
+            if weight == 0:
+                continue
+            path = ASSET_NAV_DATA_PATH.get(name)
+            if not path or not os.path.exists(path):
+                msg = f"No data file for asset '{name}': {path}"
+                logger.error(msg)
+                raise DataFileNotFoundError(name, path)
+            assets.append(Asset(name=name, feather_path=path, weight=weight, is_sip_start_of_month=True))
+        logger.info("Assets loaded")
+    except Exception:
+        logger.exception("Asset loading failed")
+        raise
+
+    # 3) Build portfolio
+    try:
+        portfolio = Portfolio(
+            goal_amount=sip_plan.goal_amount,
+            time_horizon=sip_plan.time_horizon,
+            lumpsum_amount=sip_plan.lumpsum_amount,
+            assets=assets,
+            start_date=datetime.today(),
+            risk_profile=sip_plan.risk_profile
+        )
+        portfolio.check_weights()
+        portfolio.convert_assets_to_inr()
+        logger.info("Portfolio constructed")
+    except Exception:
+        logger.exception("Portfolio construction failed")
+        raise
+
+    # 4) Compute XIRR & allocations
+    try:
+        portfolio.compute_asset_xirr(mode='median')
+        portfolio.compute_per_asset_sips()
+        portfolio.compute_portfolio_rolling_xirr(mode='median')
+        logger.info("Computed XIRRs and allocations")
+    except Exception:
+        logger.exception("XIRR/allocation computation failed")
+        raise
+
+    # 5) Simulate growth
+    try:
+        portfolio.simulate_growth()
+        logger.info("Simulated portfolio growth")
+    except Exception:
+        logger.exception("Growth simulation failed")
+        raise
+
+    # 6) Plot histogram (optional)
+    if CREATE_HISTOGRAM:
+        try:
+            SipPlotter().plot_returns(portfolio)
+            logger.info("Plotted returns histogram")
+        except Exception:
+            logger.exception("Histogram plotting failed")
+            # non-fatal: continue
+
+    # 7) Probability & SIP suggestion
+    try:
+        prob = portfolio.probability_of_reaching_goal(
+            monthly_sip=portfolio.total_monthly_sip,
+            num_simulations=NUM_SIMULATIONS,
+            lumpsum=portfolio.lumpsum_amount
+        )
+        suggested = portfolio.suggest_sip_for_probability(
+            target_prob=TARGET_PROB_OF_SUCCESS,
+            num_simulations=NUM_SIMULATIONS,
+            lumpsum=portfolio.lumpsum_amount
+        )
+        logger.info(f"Computed Goal Achievement Probability and Suggested SIP.")
+    except Exception:
+        logger.exception("Probability/SIP suggestion failed")
+        raise
+
+    # 8) Summarize and return
+    try:
+        summary = portfolio.get_portfolio_summary()
+        logger.info("Portfolio summary generated")
+        return summary
+    except Exception:
+        logger.exception("Final summary generation failed")
+        raise
+
+
+
+# def main():
+#     os.system('clear')
+    
+#     # tracemalloc.start()
+
+#     output = calculate_goal(
+#         GoalRequest(
+#             goal_amount=1_000_000,
+#             time_horizon=5,
+#             lumpsum_amount=0,
+#             risk_profile='balanced'
+#         )
+#     )
+    
+    # for time in [10]:
+    #     for risk in USER_RISK_PROFILES:
+
+    #         start = tm.time()
+    #         calculate_goal(time_horizon=time, risk_profile=risk)
+    #         end = tm.time()
+          
+    #         current, peak = tracemalloc.get_traced_memory()
+    #         print(f"Total Test Runtime: {end - start : 0.3f} s.")
+    #         print(f"Peak memory usage: {peak / 10**6:.3f} MB")
+    #         # print(f"Current memory usage: {current / 10**6:.3f} MB")
+           
+    #         print('\n------------------------------------------\n')
+    #         # exit(0)
+        
+
+    # tracemalloc.stop()
+
+    
 
     # -------------- Single Parameter Testing ---------------- #
 
@@ -156,28 +234,6 @@ def main():
     # run_test(lumpsum=1_000_000)
     # run_test(lumpsum=2_500_000)
     # run_test(lumpsum=5_000_000)
-    
-    tracemalloc.start()
-
-    print('\n------------------------------------------\n')
-    
-    for time in SIMULATION_TIME_HORIZONS:
-        for risk in USER_RISK_PROFILES:
-
-            start = tm.time()
-            run_test(time_horizon=time, risk_profile=risk)
-            end = tm.time()
-          
-            current, peak = tracemalloc.get_traced_memory()
-            print(f"Total Test Runtime: {end - start : 0.3f} s.")
-            print(f"Peak memory usage: {peak / 10**6:.3f} MB")
-            # print(f"Current memory usage: {current / 10**6:.3f} MB")
-           
-            print('\n------------------------------------------\n')
-            # exit(0)
-        
-
-    tracemalloc.stop()
     # --------------- Two Parameter Testing ----------------- #
 
 

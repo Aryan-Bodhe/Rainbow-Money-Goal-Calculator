@@ -1,10 +1,11 @@
 import os
 
 NUM_SIMULATIONS = 10000
-TARGET_PROB_OF_SUCCESS = 0.95
+TARGET_PROB_OF_SUCCESS = 0.90
 USER_RISK_PROFILES = ['conservative', 'balanced', 'aggressive']     # ['conservative', 'balanced', 'aggressive']
 SIMULATION_TIME_HORIZONS = [1,3,5,10]   # [1,3,5,10]
 LOGGING_PATH = "logs/"
+LOGGING_LIMIT = 10
 ENABLE_LOGGING = True
 CREATE_HISTOGRAM = True
 ENABLE_XIRR_DUMP = False
