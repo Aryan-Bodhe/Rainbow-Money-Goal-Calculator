@@ -1,257 +1,229 @@
-# SIP_Plotter.py
+# # SIP_Plotter.py
 
-import os
-from typing import List
+# import os
+# from typing import List
+# import numpy as np
+# import matplotlib.pyplot as plt
+# import seaborn as sns
+# import matplotlib.dates as mdates
+# import pandas as pd
 
-import matplotlib.pyplot as plt
-from matplotlib.ticker import (
-    MultipleLocator,
-    FixedLocator,
-    FuncFormatter
-)
+# import matplotlib.pyplot as plt
+# from matplotlib.ticker import (
+#     MultipleLocator,
+#     FixedLocator,
+#     FuncFormatter
+# )
 
-from core.portfolio import Portfolio
+# class SipPlotter:
+#     """
+#     A class to visualize SIP portfolio performance (multi-asset) using matplotlib.
+#     """
 
-class SipPlotter:
+#     def __init__(self):
+#         pass
+
+
+#     def plot_rolling_returns(self, rolling_returns, dates=None, bins=20, kde_bw=0.7):
+#         """
+#         Plots side-by-side:
+#         1) Distribution of rolling returns (histogram + KDE) with mode & median
+#         2) Trendline of rolling returns over time or index
+        
+#         Parameters
+#         ----------
+#         rolling_returns : list, ndarray, or pd.Series
+#             Sequence of numeric rolling-return values.
+#         dates : list of datetime, pd.DatetimeIndex, or None
+#             Matching dates for each return. If None, uses integer index [0,1,2...].
+#         bins : int
+#             Number of bins for the histogram.
+#         kde_bw : float
+#             Bandwidth adjustment for the KDE curve (smaller → less smooth).
+#         """
+#         # Convert to NumPy array
+#         rr = np.asarray(rolling_returns)
+#         n = rr.shape[0]
+        
+#         # Compute mode via the highest-count bin
+#         counts, edges = np.histogram(rr, bins=bins)
+#         mode_idx = np.argmax(counts)
+#         mode_val = (edges[mode_idx] + edges[mode_idx+1]) / 2
+#         median_val = np.median(rr)
+        
+#         # Prepare x-axis for trendline
+#         if dates is not None:
+#             x = pd.to_datetime(dates)
+#             use_dates = True
+#         else:
+#             x = np.arange(n)
+#             use_dates = False
+        
+#         # Aesthetic theme
+#         sns.set_theme(style="whitegrid", font_scale=1.1)
+        
+#         # Figure & axes
+#         fig, (ax_dist, ax_trend) = plt.subplots(
+#             1, 2, figsize=(14,5), 
+#             gridspec_kw={"width_ratios":[1,1.2]}
+#         )
+        
+#         # 1) Histogram + KDE
+#         plt.figure(figsize=(12,10))
+#         sns.histplot(rr, bins=bins, alpha=0.6, edgecolor="black", ax=ax_dist)
+#         sns.kdeplot(rr, bw_adjust=kde_bw, ax=ax_dist, color="navy", linewidth=2)
+#         ax_dist.axvline(mode_val, color="purple", linestyle="-.", label="Mode")
+#         ax_dist.axvline(median_val, color="brown",  linestyle=":",  label="Median")
+#         ax_dist.set_title("Distribution of Rolling Returns", pad=15)
+#         ax_dist.set_xlabel("Rolling Return")
+#         ax_dist.set_ylabel("Frequency / Density")
+#         ax_dist.legend()
+#         ax_dist.tick_params(axis="x", rotation=0)
+        
+#         # 2) Trendline
+#         ax_trend.plot(x, rr, marker="o", linewidth=2, markersize=4)
+#         if use_dates:
+#             ax_trend.xaxis.set_major_formatter(mdates.DateFormatter('%b %d'))
+#         ax_trend.tick_params(axis="x", rotation=0)
+#         ax_trend.set_title("Rolling Returns Over Time", pad=15)
+#         ax_trend.set_xlabel("Date" if use_dates else "Index")
+#         ax_trend.set_ylabel("Rolling Return")
+#         ax_trend.grid(True, linestyle="--", alpha=0.5)
+        
+#         # Super-title and layout
+#         fig.suptitle("Rolling Returns: Distribution and Trend", fontsize=16, y=1.02)
+#         fig.tight_layout()
+#         plt.savefig('freq_dist_chart.png', dpi=400)
+#         plt.show()
+
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import JSONResponse
+import numpy as np
+import pandas as pd
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+
+app = FastAPI()
+
+def build_plotly_fig(rolling_returns, dates=None, bins=20, kde_bw=0.7):
     """
-    A class to visualize SIP portfolio performance (multi-asset) using matplotlib.
+    Returns a Plotly Figure with:
+      • Left: Histogram + KDE (mode & median)
+      • Right: Trendline (Mon DD labels or index)
+      • Responsive layout settings
     """
+    rr = np.asarray(rolling_returns)
+    # compute mode & median
+    counts, edges = np.histogram(rr, bins=bins)
+    mode_idx   = np.argmax(counts)
+    mode_val   = (edges[mode_idx] + edges[mode_idx+1]) / 2
+    median_val = np.median(rr)
 
-    def __init__(self):
-        pass
+    # x‑axis values
+    if dates is not None:
+        x_vals = pd.to_datetime(dates)
+        x_title = "Date"
+    else:
+        x_vals = list(range(len(rr)))
+        x_title = "Index"
 
-    def plot_returns(self, portfolio: Portfolio) -> None:
-        """
-        Generate and save a stacked bar chart of total invested vs returns over time,
-        with y-axis dynamically scaled into thousands/lakhs, and showing 'cr' when
-        100 lakhs is reached. Axis titles and ticks have been enlarged for clarity.
-        """
-        investment    = portfolio.cumulative_investment
-        returns       = portfolio.cumulative_returns
-        total_months  = portfolio.time_horizon * 12 + 1
-        months        = list(range(total_months))
-        goal_amount   = portfolio.goal_amount
+    # Subplot figure
+    fig = make_subplots(
+        rows=1, cols=2,
+        column_widths=[0.6, 0.4],
+        subplot_titles=("Rolling Returns Over Time", "Distribution of Rolling Returns")
+    )
 
-        maturity_month = self._find_goal_achievement_month(
-            investment, returns, goal_amount, months
+    # Histogram
+    fig.add_trace(
+        go.Histogram(
+            x=rr,
+            xbins=dict(
+                start=edges[0],
+                end=edges[-1],
+                size=edges[1] - edges[0]
+            ),
+            nbinsx=bins,
+            opacity=0.6,
+            marker_line_color="black",
+            name="Histogram",
+            marker_line_width=1,      
+            hovertemplate="Range: %{x:.2f}%, Count: %{y}<extra></extra>"
+        ),
+        row=1, col=2
+    )
+
+    # Mode & Median
+    fig.add_trace(
+        go.Scatter(
+            x=[mode_val, mode_val], y=[0, counts.max()],
+            mode="lines",
+            line=dict(color="purple", dash="dashdot"),
+            name="Mode",
+            hovertemplate="Mode: %{x:.2f}%<extra></extra>"
+        ),
+        row=1, col=2
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=[median_val, median_val], y=[0, counts.max()],
+            mode="lines",
+            line=dict(color="brown", dash="dot"),
+            name="Median",
+            hovertemplate="Median: %{x:.2f}%<extra></extra>"
+        ),
+        row=1, col=2
+    )
+
+    #---------------------------
+    # Second Plot
+    fig.add_trace(
+        go.Scatter(
+            x=x_vals, y=rr,
+            mode="lines",
+            marker=dict(size=6),
+            line=dict(width=2, color='green'),
+            name="Rolling Return",
+            fill='tozeroy',  # Fills down to the x-axis
+            fillcolor='rgba(0, 100, 0, 0.3)',  # Light green shadow
+        ),
+        row=1, col=1
+    )
+
+    # Layout & formatting
+    fig.update_xaxes(title_text=x_title, row=1, col=1)
+    fig.update_yaxes(title_text="Rolling Returns %",  row=1, col=1)
+    fig.update_xaxes(title_text="Rolling Returns %",  row=1, col=2)
+    fig.update_yaxes(title_text="Frequency",       row=1, col=2)
+    fig.update_layout(xaxis=dict(type='date'))
+    fig.update_layout(
+        legend=dict(
+            x=0.02,         # x position (0 to 1, from left to right)
+            y=0.98,         # y position (0 to 1, from bottom to top)
+            bgcolor='rgba(255,255,255,0.5)',  # Optional: semi-transparent background
+            bordercolor='black',
+            borderwidth=1,
+            font=dict(size=12),
         )
+    )
+    fig.update_layout(
+        hovermode="x unified",
+        autosize=True,
+        margin=dict(l=20, r=20, t=60, b=20)
+    )
+    return fig
 
-        padding = (portfolio.lumpsum_amount != 0)
+@app.post("/rolling-returns-spec")
+async def rolling_returns_spec(payload: dict):
+    """
+    Request JSON: { "returns": [..], "dates": [..] }  # dates optional
+    Response JSON: Plotly figure spec (data + layout)
+    """
+    returns = payload.get("returns")
+    if returns is None:
+        raise HTTPException(400, "Missing 'returns' array")
+    dates = payload.get("dates", None)
+    fig = build_plotly_fig(returns, dates)
+    # Return the full figure spec as JSON
+    return JSONResponse(status_code=200, content=fig.to_dict())
 
-        self._plot_stacked_returns_chart(
-            months, investment, returns, goal_amount, maturity_month, padding
-        )
-
-        if maturity_month != -1:
-            ax = plt.gca()
-            xticks = ax.get_xticks()
-            xticks_int = [int(round(t)) for t in xticks]
-            xtick_labels = [
-                f"$\\bf{{{t}}}$" if t == maturity_month else str(t)
-                for t in xticks_int
-            ]
-            ax.xaxis.set_major_locator(FixedLocator(xticks))
-            ax.set_xticklabels(xtick_labels, color='lightgray', fontsize=14)
-
-        plt.tight_layout(pad=2.0)
-        os.makedirs('./temp', exist_ok=True)
-        plt.savefig('./temp/returns_histogram.png', dpi=400)
-        plt.close()
-
-    def _plot_stacked_returns_chart(
-        self,
-        months: List[int],
-        investment: List[float],
-        returns: List[float],
-        goal_amount: float,
-        maturity_month: int,
-        left_padding: bool
-    ) -> None:
-        """
-        Internal helper to render a stacked bar chart on a dark background,
-        automatically scaling the y-axis into thousands or lakhs depending on the data.
-        - If max_total < 1e5: scale_factor = 1e3  (thousands)
-        - If max_total >= 1e5: scale_factor = 1e5 (lakhs)
-        Within lakhs, whenever a tick = 100 (i.e. 100 lakhs = 1 cr), we label “1 cr.”
-        Axis titles and ticks have been enlarged for better readability.
-        """
-        # Step 1: Find maximum total value (investment + returns or goal):
-        total_series = [inv + ret for inv, ret in zip(investment, returns)]
-        max_total    = max(total_series + [goal_amount])
-
-        # Step 2: Decide on scale factor and unit label:
-        if max_total >= 1e5:
-            # Use lakhs as base unit
-            scale_factor = 1e5
-            unit_label   = " (in lakhs)"
-        elif max_total >= 1e3:
-            # Use thousands as base unit
-            scale_factor = 1e3
-            unit_label   = " (in thousands)"
-        else:
-            # No scaling needed
-            scale_factor = 1.0
-            unit_label   = ""
-
-        # Step 3: Scale the data
-        scaled_investment = [val / scale_factor for val in investment]
-        scaled_returns    = [val / scale_factor for val in returns]
-        scaled_goal       = goal_amount / scale_factor
-
-        # Step 4: Create figure + axes, with a slightly smaller size to enlarge fonts
-        fig = plt.figure(figsize=(20, 12), facecolor='black')
-        ax  = fig.add_subplot(111)
-        ax.set_facecolor('#1e1e1e')  # very dark grey
-
-        # Step 5: Plot stacked bars + goal line with neon colors
-        ax.bar(
-            months,
-            scaled_investment,
-            label='Invested Amount',
-            color="#00B5C9",  # neon cyan
-            zorder=3
-        )
-        ax.bar(
-            months,
-            scaled_returns,
-            bottom=scaled_investment,
-            label='Returns (Gain)',
-            color="#FFAE00",  # neon yellow
-            zorder=4
-        )
-        ax.axhline(
-            y=scaled_goal,
-            color='#00FF92',  # neon green
-            linestyle='--',
-            label='Goal Amount',
-            zorder=5
-        )
-
-        # Step 6: If goal achieved, draw neon magenta vertical line
-        if maturity_month != -1:
-            ax.axvline(
-                x=maturity_month,
-                color='#FF00E1',  # neon magenta
-                linestyle='--',
-                linewidth=2,
-                label=(
-                    fr'Goal Achievement in '
-                    rf'($\mathbf{{{maturity_month//12}\ yr,\ {maturity_month%12}\ months}}$)'
-                ),
-                zorder=5
-            )
-
-        # Step 7: Style spines and ticks, enlarging tick labels
-        for spine in ax.spines.values():
-            spine.set_color('gray')
-        ax.tick_params(axis='x', colors='lightgray', labelsize=12)
-        ax.tick_params(axis='y', colors='lightgray', labelsize=12)
-
-        # Step 8: X/Y labels and title (larger font sizes)
-        ax.set_xlabel('Month', color='lightgray', fontsize=16)
-        ax.set_ylabel('Total Investment Value' + unit_label, color='lightgray', fontsize=16)
-        ax.set_title('SIP Investment vs Returns Over Time', color='lightgray', fontsize=18)
-
-        # Step 9: Grid lines
-        ax.grid(color="#3d3d3d", zorder=0)
-
-        # Step 10: X‐limits and X‐ticks (every 6 months)
-        ax.set_xlim(left=-1 if left_padding else 0)
-        ax.xaxis.set_major_locator(MultipleLocator(6))
-
-        # Step 11: Y‐tick spacing
-        if scaled_goal < 10:
-            interval = scaled_goal / 10
-        else:
-            interval = max(int(scaled_goal / 10), 1)
-        ax.yaxis.set_major_locator(MultipleLocator(interval))
-
-        # Step 12: Ensure the y-axis starts at zero, so no negative ticks
-        ax.set_ylim(bottom=0)
-
-        # Step 13: Custom y‐axis formatter
-        def y_formatter(x, _pos):
-            """
-            - If scale_factor == 1e5 (lakhs):
-              • If x ≥ 100 (i.e. 100 lakhs = ₹1 cr), label as “X.Y cr” or “N cr” if integer.
-              • If 0 < x < 100 and x is integer, label as integer (meaning lakhs).
-              • If 0 < x < 100 and x is fractional, label with one decimal (e.g. 1.5).
-            - If scale_factor == 1e3 (thousands):
-              • Show the raw rupee amount with commas (e.g. x=50 → “50,000”).
-            - If scale_factor == 1.0:
-              • Show integer or one decimal if needed.
-            """
-            ix = float(x)
-            if ix < 0:
-                return ""  # avoid labeling negative
-            if ix == 0:
-                return "0"
-
-            # Case A: using lakhs
-            if scale_factor == 1e5:
-                if ix >= 100:
-                    crores_val = ix / 100
-                    # If exactly whole crore:
-                    if abs(crores_val - round(crores_val)) < 1e-6:
-                        return f"{int(round(crores_val))} Cr"
-                    else:
-                        return f"{crores_val:.1f} Cr"
-                # Below 100 lakhs:
-                if abs(ix - round(ix)) < 1e-6:
-                    return f"{int(round(ix))} L"
-                return f"{ix:.1f}"
-
-            # Case B: using thousands
-            elif scale_factor == 1e3:
-                actual_value = int(round(ix * 1000))
-                return f"{actual_value:,} Th"
-
-            # Case C: no scaling
-            else:
-                if abs(ix - round(ix)) < 1e-6:
-                    return f"{int(round(ix))}"
-                return f"{ix:.1f}"
-
-        ax.yaxis.set_major_formatter(FuncFormatter(y_formatter))
-
-        # Step 14: Bold the tick corresponding to the goal value
-        ticks = ax.get_yticks()
-        # Filter out any negative ticks
-        nonneg_ticks = [t for t in ticks if t >= 0]
-        formatted_labels = [y_formatter(t, None) for t in nonneg_ticks]
-
-        ax.set_yticks(nonneg_ticks)
-        ax.set_yticklabels(
-            formatted_labels,
-            color='lightgray',
-            fontsize=14
-        )
-
-        for text in ax.get_yticklabels():
-            if text.get_text() == y_formatter(scaled_goal, None):
-                text.set_fontweight('bold')
-
-        # Step 15: Legend styling
-        legend = ax.legend(fontsize=10)
-        frame = legend.get_frame()
-        frame.set_facecolor('none')
-        frame.set_edgecolor('gray')
-        for text in legend.get_texts():
-            text.set_color('lightgray')
-            text.set_fontsize(14)
-
-    def _find_goal_achievement_month(
-        self,
-        investment: List[float],
-        returns: List[float],
-        goal_amount: float,
-        months: List[int]
-    ) -> int:
-        """
-        Find the first month where (investment + returns) ≥ goal_amount.
-        """
-        total_values = [inv + ret for inv, ret in zip(investment, returns)]
-        for idx, val in enumerate(total_values):
-            if val >= goal_amount:
-                return months[idx]
-        return -1

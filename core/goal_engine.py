@@ -8,7 +8,7 @@ from core.asset import Asset
 from core.exceptions import DataFileNotFoundError
 from core.portfolio import Portfolio
 from core.sip_goal_based import SipGoalBased
-from core.sip_plotter import SipPlotter
+from core.sip_plotter import build_plotly_fig
 from models.portfolio import PortfolioSummary
 from utils.logger import get_logger
 
@@ -82,7 +82,7 @@ def run_analysis(
     try:
         portfolio.compute_asset_xirr(mode='median')
         portfolio.compute_per_asset_sips()
-        portfolio.compute_portfolio_rolling_xirr(mode='median')
+        xirrs, dates = portfolio.compute_portfolio_rolling_xirr(mode='median')
         logger.info("Computed XIRRs and allocations")
     except Exception:
         logger.exception("XIRR/allocation computation failed")
@@ -99,7 +99,7 @@ def run_analysis(
     # 6) Plot histogram (optional)
     if CREATE_HISTOGRAM:
         try:
-            SipPlotter().plot_returns(portfolio)
+            # SipPlotter().plot_returns(portfolio)
             logger.info("Plotted returns histogram")
         except Exception:
             logger.exception("Histogram plotting failed")
@@ -121,6 +121,19 @@ def run_analysis(
     except Exception:
         logger.exception("Probability/SIP suggestion failed")
         raise
+
+    # try:
+    # 2) Build the figure
+    fig = build_plotly_fig(xirrs, dates)
+
+    # 3a) Save as interactive HTML (so you can open it in your browser)
+    fig.write_html(
+        "temp/test_rolling_returns.html",
+        include_plotlyjs="cdn",  # embeds Plotly.js from CDN
+        full_html=True
+    )
+    # except Exception:
+    #     logger.warning('Plotly figure generation failed.')
 
     # 8) Summarize and return
     try:

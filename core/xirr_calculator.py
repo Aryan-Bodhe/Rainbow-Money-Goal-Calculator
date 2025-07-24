@@ -4,6 +4,9 @@ import pandas as pd
 import pyxirr
 from typing import List, Literal
 from colorama import Fore
+import matplotlib.pyplot as plt
+import seaborn as sns
+from collections import Counter
 
 from config import ENABLE_XIRR_DUMP
 from core.exceptions import (
@@ -42,6 +45,7 @@ class XirrCalculator:
         """
         months = time_horizon * 12
         xirrs: List[float] = []
+        end_dates: List = []
 
         for start in range(len(df) - months):
             window = df.iloc[start : start + months + 1]
@@ -67,10 +71,11 @@ class XirrCalculator:
             try:
                 xirr_val = pyxirr.xirr(dict(zip(dates, amounts))) * 100
                 xirrs.append(xirr_val)
+                end_dates.append(window['Date'].iloc[months])
             except Exception as e:
                 raise XirrComputationFailedError(e)
 
-        return xirrs
+        return xirrs, end_dates
 
     def compute_rolling_xirr(
         self,
@@ -78,7 +83,7 @@ class XirrCalculator:
         feather_path: str | None = None,
         df: pd.DataFrame | None = None,
         mode: Literal["mean", "median", "optimistic", "pessimistic"] = "median"
-    ) -> float:
+    ) -> tuple[float, list, list]:
         """
         Estimate return using rolling SIP XIRR approach over historical data.
 
@@ -107,23 +112,21 @@ class XirrCalculator:
         df = df.sort_values('Date').reset_index(drop=True)
 
         # Compute rolling XIRRs
-        xirrs = self._compute_rolling_window_xirrs(df, time_horizon)
+        xirrs, end_dates = self._compute_rolling_window_xirrs(df, time_horizon)
         if not xirrs:
             raise HistoricalDataTooLowError('', '', '')
 
-        if ENABLE_XIRR_DUMP:
-            print(xirrs)
 
         # Return appropriate statistic
         series = pd.Series(xirrs)
         if mode == "median":
-            return round(series.median(), 2)
+            return round(series.median(), 2), xirrs, end_dates
         elif mode == "mean":
-            return round(series.mean(), 2)
+            return round(series.mean(), 2), xirrs, end_dates
         elif mode == "pessimistic":
-            return round(series.quantile(0.25), 2)
+            return round(series.quantile(0.25), 2), xirrs, end_dates
         elif mode == "optimistic":
-            return round(series.quantile(0.75), 2)
+            return round(series.quantile(0.75), 2), xirrs, end_dates
         else:
             raise InvalidReturnCalculationModeError(
                 mode, ("median", "mean", "pessimistic", "optimistic")

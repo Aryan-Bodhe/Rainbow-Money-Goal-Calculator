@@ -54,7 +54,7 @@ class Portfolio:
 
         # Probability-related
         self._composite_nav_df: pd.DataFrame | None = None
-        self.goal_achievement_probability: float = 0.0
+        self.goal_achievement_probability: float = None
         self.suggested_sip: float = 0.0
 
     def check_weights(self) -> None:
@@ -121,13 +121,13 @@ class Portfolio:
             "NAV_INR": nav_series.values
         }).reset_index(drop=True)
 
-    def compute_portfolio_rolling_xirr(self, mode: Literal["mean", "median", "optimistic", "pessimistic"] = "median") -> float:
+    def compute_portfolio_rolling_xirr(self, mode: Literal["mean", "median", "optimistic", "pessimistic"] = "median") -> tuple[float, list]:
         """
         Computes portfolio-level rolling XIRR from historical composite NAV.
         """
         hist_nav = self.build_portfolio_nav()
-        self.portfolio_xirr = XirrCalculator().compute_rolling_xirr(self.time_horizon, df=hist_nav, mode=mode)
-        return self.portfolio_xirr
+        self.portfolio_xirr, xirrs, dates = XirrCalculator().compute_rolling_xirr(self.time_horizon, df=hist_nav, mode=mode)
+        return xirrs, dates
 
     def simulate_growth(self) -> None:
         """
@@ -246,7 +246,8 @@ class Portfolio:
 
         portfolio_vals = values.sum(axis=1)
         prob = float((portfolio_vals >= self.goal_amount).mean())
-        self.goal_achievement_probability = prob
+        if self.goal_achievement_probability is None:
+            self.goal_achievement_probability = prob
         return prob
 
     def suggest_sip_for_probability(

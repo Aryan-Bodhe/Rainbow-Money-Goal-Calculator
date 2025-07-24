@@ -1,6 +1,7 @@
 # main.py
 
 import time as tm
+from rich.console import Console
 import tracemalloc
 import asyncio
 from fastapi import FastAPI, HTTPException
@@ -51,6 +52,7 @@ async def calculate_goal(req: GoalRequest) -> JSONResponse:
         logger.info(f"Peak memory usage: {peak / 10**6:.3f} MB")
         logger.info('Goal Calculation Completed Successfully.')
         logger.info('------------------------------------------')
+        # console.print_json(data=result.model_dump())
         return result
     except DataFileNotFoundError as e:
         logger.exception("Unexpected error during goal calculation.")
@@ -58,3 +60,19 @@ async def calculate_goal(req: GoalRequest) -> JSONResponse:
     except Exception as e:
         logger.exception("Unexpected error during goal calculation.")
         raise HTTPException(status_code=500, detail="Internal error")
+
+
+if __name__ == '__main__':
+    console = Console()
+    output = asyncio.run( 
+        calculate_goal(
+            GoalRequest(
+                goal_amount=1_000_000,
+                time_horizon=5,
+                lumpsum_amount=0,
+                risk_profile='conservative',
+            )
+        )
+    )
+
+

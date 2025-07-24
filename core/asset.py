@@ -83,7 +83,7 @@ class Asset:
 
         xirr_calc = XirrCalculator()
 
-        expected = xirr_calc.compute_rolling_xirr(
+        expected, _, _ = xirr_calc.compute_rolling_xirr(
             time_horizon=time_horizon,
             df=self._df,
             mode=mode

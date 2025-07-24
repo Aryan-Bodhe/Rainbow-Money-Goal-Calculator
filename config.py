@@ -1,13 +1,12 @@
 import os
 
-NUM_SIMULATIONS = 10000
+NUM_SIMULATIONS = 5000
 TARGET_PROB_OF_SUCCESS = 0.90
 USER_RISK_PROFILES = ['conservative', 'balanced', 'aggressive']     # ['conservative', 'balanced', 'aggressive']
 SIMULATION_TIME_HORIZONS = [1,3,5,10]   # [1,3,5,10]
-LOGGING_PATH = "logs/"
+LOGGING_DIR = "logs/"
 LOGGING_LIMIT_DAYS = 10
 CREATE_HISTOGRAM = False
-ENABLE_XIRR_DUMP = False
 
 HISTOGRAM_PATH = 'temp/returns_histogram.png'
 FOREX_RATES_DIR = os.path.join(os.getcwd(), 'data/newfinal/monthly_forex/')
@@ -15,11 +14,11 @@ FOREX_RATES_DIR = os.path.join(os.getcwd(), 'data/newfinal/monthly_forex/')
 # Ensure that the asset names exist in the data paths
 CONSERVATIVE_PORTFOLIO = {
     # "smallcap": 0.0,
-    "largecap": 0.20,
-    "s&p_500":0.1,
+    "largecap": 1,
+    # "s&p_500":0.1,
     # "midcap": 0.0,
     # "debt": 0.7,
-    "gold": 0.7
+    # "gold": 0.7
 }
 
 BALANCED_PORTFOLIO = {
