@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from core.goal_engine import run_analysis
 from core.exceptions import DataFileNotFoundError
 from models.goal_request import GoalRequest
-from models.portfolio import PortfolioSummary
+from models.portfolio_summary import PortfolioSummary
 from utils.logger import get_logger
 
 # Initialize FastAPI app

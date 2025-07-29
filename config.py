@@ -13,44 +13,32 @@ FOREX_RATES_DIR = os.path.join(os.getcwd(), 'data/newfinal/monthly_forex/')
 
 # Ensure that the asset names exist in the data paths
 CONSERVATIVE_PORTFOLIO = {
-    # "smallcap": 0.0,
-    "largecap": 1,
-    # "s&p_500":0.1,
-    # "midcap": 0.0,
-    # "debt": 0.7,
-    # "gold": 0.7
+    "largecap": 0.2,
+    "fixed_deposit": 0.6,
+    "gold": 0.2
 }
 
 BALANCED_PORTFOLIO = {
-    # "smallcap": 0.0,
     "largecap": 0.30,
     "s&p_500": 0.20,
-    # "midcap": 0.15,
-    # "debt": 0.30,
-    "gold": 0.5
+    "gold": 0.3,
+    "fixed_deposit": 0.2
 }
 
 AGGRESSIVE_PORTFOLIO = {
-    # "smallcap": 0.0,
     "largecap": 0.4,
     "s&p_500": 0.3,
-    # "midcap": 0.20,
-    # "debt": 0.10,
     "gold": 0.30
+}
+
+# Used if data file for asset not found
+ASSET_RETURN_RATES = {
+    "fixed_deposit": 7
 }
 
 # Ensure that the asset names here exist in the portfolios
 ASSET_NAV_DATA_PATH = {
-    # "smallcap": os.path.join(os.getcwd(), "data/final/navs/smallcap.feather"),
-    # "midcap":   os.path.join(os.getcwd(), "data/final/navs/midcap.feather"),
-    # "largecap": os.path.join(os.getcwd(), "data/final/navs/largecap.feather"),
-    # "s&p_500":  os.path.join(os.getcwd(), "data/final/navs/s&p500.feather"),
-    # "debt":     os.path.join(os.getcwd(), "data/final/navs/debt.feather"),
-    # "gold":     os.path.join(os.getcwd(), "data/final/navs/gold.feather")
-    # "smallcap": os.path.join(os.getcwd(), "data/newfinal/"),
-    # "midcap":   os.path.join(os.getcwd(), "data/final_syn/midcap.feather"),
     "largecap": os.path.join(os.getcwd(), "data/newfinal/monthly_nav/largecap.feather"),
     "s&p_500":  os.path.join(os.getcwd(), "data/newfinal/monthly_nav/sp500.feather"),
-    # "debt":     os.path.join(os.getcwd(), "data/final_syn/debt.feather"),
-    "gold":     os.path.join(os.getcwd(), "data/newfinal/monthly_nav/gold.feather")
+    "gold":     os.path.join(os.getcwd(), "data/newfinal/monthly_nav/gold.feather"),
 }

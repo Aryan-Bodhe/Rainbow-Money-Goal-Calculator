@@ -129,8 +129,8 @@ def build_plotly_fig(rolling_returns, dates=None, bins=20, kde_bw=0.7):
 
     # Subplot figure
     fig = make_subplots(
-        rows=1, cols=2,
-        column_widths=[0.6, 0.4],
+        rows=2, cols=1,
+        # column_widths=[0.6, 0.4],
         subplot_titles=("Rolling Returns Over Time", "Distribution of Rolling Returns")
     )
 
@@ -150,7 +150,7 @@ def build_plotly_fig(rolling_returns, dates=None, bins=20, kde_bw=0.7):
             marker_line_width=1,      
             hovertemplate="Range: %{x:.2f}%, Count: %{y}<extra></extra>"
         ),
-        row=1, col=2
+        row=2, col=1
     )
 
     # Mode & Median
@@ -162,7 +162,7 @@ def build_plotly_fig(rolling_returns, dates=None, bins=20, kde_bw=0.7):
             name="Mode",
             hovertemplate="Mode: %{x:.2f}%<extra></extra>"
         ),
-        row=1, col=2
+        row=2, col=1
     )
     fig.add_trace(
         go.Scatter(
@@ -172,7 +172,7 @@ def build_plotly_fig(rolling_returns, dates=None, bins=20, kde_bw=0.7):
             name="Median",
             hovertemplate="Median: %{x:.2f}%<extra></extra>"
         ),
-        row=1, col=2
+        row=2, col=1
     )
 
     #---------------------------
@@ -193,8 +193,8 @@ def build_plotly_fig(rolling_returns, dates=None, bins=20, kde_bw=0.7):
     # Layout & formatting
     fig.update_xaxes(title_text=x_title, row=1, col=1)
     fig.update_yaxes(title_text="Rolling Returns %",  row=1, col=1)
-    fig.update_xaxes(title_text="Rolling Returns %",  row=1, col=2)
-    fig.update_yaxes(title_text="Frequency",       row=1, col=2)
+    fig.update_xaxes(title_text="Rolling Returns %",  row=2, col=1)
+    fig.update_yaxes(title_text="Frequency",       row=2, col=1)
     fig.update_layout(xaxis=dict(type='date'))
     fig.update_layout(
         legend=dict(

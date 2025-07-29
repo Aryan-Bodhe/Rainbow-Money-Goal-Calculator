@@ -1,16 +1,7 @@
 import pandas as pd
-from datetime import datetime
-import pyxirr
 
 from core.xirr_calculator import XirrCalculator
 from core.currency_converter import CurrencyConverter
-from core.exceptions import (
-    InvalidStartDateError,
-    LumpsumEnoughToReachGoalError, 
-    InvalidTimeHorizonError, 
-    InvalidReturnRateError, 
-    XirrComputationFailedError
-)
 
 class Asset:
     """
@@ -26,7 +17,8 @@ class Asset:
         name: str,
         feather_path: str,
         weight: float,
-        is_sip_start_of_month: bool = False
+        is_sip_start_of_month: bool = True,
+        return_rate: float = None
     ):
         """
         :param name: Asset name (e.g., "smallcap").
@@ -39,15 +31,18 @@ class Asset:
         self.weight = weight
         self.is_sip_start_of_month = is_sip_start_of_month
 
-        self.expected_return_rate: float = 0.0   # % annual, from rolling‐window XIRR
+        self.expected_return_rate: float = return_rate   # % annual, from rolling‐window XIRR
         self.asset_sip_amount: float = 0.0       # ₹ SIP per month for this asset
         self.asset_xirr: float = 0.0             # XIRR % computed for this asset
         self._df: pd.DataFrame | None = None     # loaded historical DataFrame
+        self.data_available = False if return_rate else True
 
     def convert_navs_to_inr(self) -> None:
         """
         Converts the NAV of the historical data to INR using date-matched conversion rates.
         """
+        if not self.data_available:
+            return
         curr_conv = CurrencyConverter()
         if self._df is None:
             self.load_history()
@@ -60,6 +55,8 @@ class Asset:
         Reads the Feather file into self._df, normalizes dates to midnight, and sorts.
         Expects the Feather file to contain a 'Date' column.
         """
+        if not self.data_available:
+            return
         df = pd.read_feather(self.feather_path)
         df['Date'] = pd.to_datetime(df['Date']).dt.normalize()
         df = df.sort_values('Date').reset_index(drop=True)
@@ -78,6 +75,9 @@ class Asset:
         :param mode: Aggregation mode over rolling windows ('median', 'mean', etc.)
         :return: Estimated annual return rate (%)
         """
+        if not self.data_available:
+            return self.expected_return_rate
+        
         if self._df is None:
             self.load_history()
 
@@ -115,71 +115,3 @@ class Asset:
         # SIP should not be negative. If it is, default to 0.
         self.asset_sip_amount = max(0, round(sip_amt, 2))
         return self.asset_sip_amount
-
-    def compute_forecasted_asset_xirr(
-        self,
-        goal_amt: float,
-        lumpsum_amt: float = 0.0,
-        start_date: datetime = None,
-        total_months: int = 0,
-    ) -> float:
-        """
-        Builds a forward-looking cashflow dictionary using expected_return_rate
-        (no future price lookup), then computes XIRR using pyxirr.
-
-        :param goal_amt: Target amount to reach (₹).
-        :param lumpsum_amt: Lumpsum investment at start (₹). Default is 0.
-        :param start_date: Start date of investment.
-        :param total_months: Investment duration in months.
-        :return: Asset XIRR (%) rounded to 2 decimal places.
-        """
-        if self.expected_return_rate <= 0:
-            raise InvalidReturnRateError(self.expected_return_rate)
-
-        if start_date is None:
-            raise InvalidStartDateError(start_date)
-
-        if total_months <= 0:
-            raise InvalidTimeHorizonError(total_months / 12)
-
-        r_annual = self.expected_return_rate / 100
-        r_monthly = r_annual / 12
-        N = total_months
-
-        sip_amt = self.asset_sip_amount
-
-        # Compute final value from both lumpsum and SIP growth
-        lumpsum_growth = lumpsum_amt * (1 + r_monthly) ** N
-        sip_growth = 0
-
-        if lumpsum_growth > goal_amt:
-            self.asset_xirr = 0.0
-            raise LumpsumEnoughToReachGoalError(lumpsum_amt, goal_amt)
-
-        if r_monthly != 0:
-            sip_growth = sip_amt * (((1 + r_monthly) ** N - 1) / r_monthly) * (1 + r_monthly)
-        else:
-            sip_growth = sip_amt * N  # No interest case
-
-        final_value = lumpsum_growth + sip_growth
-
-        # Build date-wise cashflow dictionary
-        cf_dict: dict[datetime, float] = {}
-        t0 = pd.Timestamp(start_date.date())
-
-        cf_dict[t0] = -round(lumpsum_amt + sip_amt, 2)  # Initial outflow
-
-        for m in range(1, N):
-            sip_date = t0 + pd.DateOffset(months=m)
-            cf_dict[sip_date] = -round(sip_amt, 2)
-
-        redemption_date = t0 + pd.DateOffset(months=N)
-        cf_dict[redemption_date] = round(final_value, 2)  # Final inflow
-
-        try:
-            rate = pyxirr.xirr(cf_dict) * 100
-        except Exception as e:
-            raise XirrComputationFailedError(e)
-
-        self.asset_xirr = round(rate, 2)
-        return self.asset_xirr

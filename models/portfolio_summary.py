@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from typing import Union, List
-from .asset import AssetSummary
+from .asset_summary import AssetSummary
 
 class PortfolioSummary(BaseModel):
     goal_amount: float

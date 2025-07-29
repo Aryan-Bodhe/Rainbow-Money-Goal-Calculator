@@ -8,8 +8,8 @@ import numpy as np
 
 from core.asset import Asset
 from core.xirr_calculator import XirrCalculator
-from models.asset import AssetSummary
-from models.portfolio import PortfolioSummary
+from models.asset_summary import AssetSummary
+from models.portfolio_summary import PortfolioSummary
 
 class Portfolio:
     """
@@ -166,7 +166,7 @@ class Portfolio:
                 weight=a.weight,
                 expected_return=self.asset_returns.get(a.name, 0.0),
                 sip_amount=self.asset_sips.get(a.name, 0.0),
-                xirr=self.asset_returns.get(a.name, 0.0)
+                # xirr=self.asset_returns.get(a.name, 0.0)
             )
             for a in self.assets
         ]
@@ -197,21 +197,72 @@ class Portfolio:
                 else "No additional SIP required."
             )
         )
+    
+    def _simulate_asset_navs(self, asset: Asset, date_range: pd.Series, base_price: float = 10.0):
+        """
+        Simulates NAV history for a given asset using expected return rate,
+        generating data for each date in `date_range`.
+        """
+        annual_rate = asset.expected_return_rate / 100  # e.g., 0.12 for 12%
+        monthly_rate = (1 + annual_rate) ** (1/12) - 1  # Monthly compounding rate
+
+        navs = [base_price]
+        for _ in range(1, len(date_range)):
+            # Deterministic compounding
+            new_nav = navs[-1] * (1 + monthly_rate)
+            navs.append(round(new_nav, 2))
+
+        df = pd.DataFrame({'Date': date_range, 'NAV_INR': navs})
+        df['Date'] = pd.to_datetime(df['Date'])
+        df = df[['Date', 'NAV_INR']]
+
+        # Save into the asset for access later
+        asset._df = df
+
 
     def prepare_composite_nav(self) -> None:
         """
         Aligns each Asset's NAV_INR history by date and fills gaps,
         storing in self._composite_nav_df.
+
+        If NAV data for an asset is missing, simulates it using the asset's
+        expected return rate and a shared date range from other assets.
         """
         dfs = []
+        to_do = []
+        date_range = None
+
+        # Step 1: Find date_range and collect existing NAVs
         for asset in self.assets:
+            if asset._df is None:
+                to_do.append(asset)
+                continue
+
+            # Set date_range from first available asset
+            if date_range is None:
+                date_range = asset._df['Date']
+
             df = asset._df[['Date', 'NAV_INR']].copy()
             df.set_index('Date', inplace=True)
             df.rename(columns={'NAV_INR': asset.name}, inplace=True)
             dfs.append(df)
 
+        # Step 2: Sanity check for missing date_range
+        if date_range is None:
+            raise ValueError("No asset contains NAV data. Cannot infer date range for simulation.")
+
+        # Step 3: Simulate missing assets
+        for asset in to_do:
+            self._simulate_asset_navs(asset, date_range)
+            df = asset._df[['Date', 'NAV_INR']].copy()
+            df.set_index('Date', inplace=True)
+            df.rename(columns={'NAV_INR': asset.name}, inplace=True)
+            dfs.append(df)
+
+        # Step 4: Combine all NAVs
         combined = pd.concat(dfs, axis=1).sort_index().ffill().bfill()
         self._composite_nav_df = combined
+
 
     def probability_of_reaching_goal(
         self,

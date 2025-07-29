@@ -3,13 +3,13 @@ import os
 from datetime import datetime
 from typing import Literal
 
-from config import ASSET_NAV_DATA_PATH, CREATE_HISTOGRAM, NUM_SIMULATIONS, TARGET_PROB_OF_SUCCESS
+from config import ASSET_NAV_DATA_PATH, ASSET_RETURN_RATES, CREATE_HISTOGRAM, NUM_SIMULATIONS, TARGET_PROB_OF_SUCCESS
 from core.asset import Asset
 from core.exceptions import DataFileNotFoundError
 from core.portfolio import Portfolio
 from core.sip_goal_based import SipGoalBased
 from core.sip_plotter import build_plotly_fig
-from models.portfolio import PortfolioSummary
+from models.portfolio_summary import PortfolioSummary
 from utils.logger import get_logger
 
 
@@ -51,11 +51,16 @@ def run_analysis(
             if weight == 0:
                 continue
             path = ASSET_NAV_DATA_PATH.get(name)
+            if path is None:
+                return_rate = ASSET_RETURN_RATES.get(name)
+                if return_rate is not None:
+                    assets.append(Asset(name=name, feather_path=None, weight=weight, return_rate=return_rate))
+                    continue
             if not path or not os.path.exists(path):
                 msg = f"No data file for asset '{name}': {path}"
                 logger.error(msg)
                 raise DataFileNotFoundError(name, path)
-            assets.append(Asset(name=name, feather_path=path, weight=weight, is_sip_start_of_month=True))
+            assets.append(Asset(name=name, feather_path=path, weight=weight))
         logger.info("Assets loaded")
     except Exception:
         logger.exception("Asset loading failed")

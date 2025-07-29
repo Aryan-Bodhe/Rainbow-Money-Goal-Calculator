@@ -8,7 +8,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from collections import Counter
 
-from config import ENABLE_XIRR_DUMP
 from core.exceptions import (
     HistoricalDataTooLowError,
     NeitherDataNorPathProvidedError,

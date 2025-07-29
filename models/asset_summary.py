@@ -6,4 +6,3 @@ class AssetSummary(BaseModel):
     weight: float
     expected_return: float
     sip_amount: float
-    xirr: Optional[float] = None
