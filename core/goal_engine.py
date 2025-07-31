@@ -10,6 +10,7 @@ from core.portfolio import Portfolio
 from core.sip_goal_based import SipGoalBased
 from core.sip_plotter import build_plotly_fig
 from models.portfolio_summary import PortfolioSummary
+from models.goal_request import AssetAllocation
 from utils.logger import get_logger
 
 
@@ -17,7 +18,8 @@ def run_analysis(
     goal_amount: float,
     time_horizon: int,
     lumpsum: float,
-    risk_profile: Literal['conservative','balanced','aggressive']
+    risk_profile: Literal['conservative','balanced','aggressive', 'custom'],
+    allocation: AssetAllocation
 ) -> PortfolioSummary:
     """
     Orchestrates the entire pipeline for SIP goal analysis:
@@ -37,7 +39,8 @@ def run_analysis(
             goal=goal_amount,
             time_horizon=time_horizon,
             lumpsum=lumpsum,
-            risk_profile=risk_profile
+            risk_profile=risk_profile,
+            allocation=allocation
         )
         logger.info("SIP plan initialized")
     except Exception:
@@ -54,12 +57,14 @@ def run_analysis(
             if path is None:
                 return_rate = ASSET_RETURN_RATES.get(name)
                 if return_rate is not None:
-                    assets.append(Asset(name=name, feather_path=None, weight=weight, return_rate=return_rate))
+                    # Create constant return Asset
+                    assets.append(Asset(name=name, feather_path=None, weight=weight, return_rate=return_rate, deterministic=True))
                     continue
             if not path or not os.path.exists(path):
                 msg = f"No data file for asset '{name}': {path}"
                 logger.error(msg)
                 raise DataFileNotFoundError(name, path)
+            # Create variable return Asset
             assets.append(Asset(name=name, feather_path=path, weight=weight))
         logger.info("Assets loaded")
     except Exception:

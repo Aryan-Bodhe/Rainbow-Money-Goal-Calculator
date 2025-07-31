@@ -18,7 +18,8 @@ class Asset:
         feather_path: str,
         weight: float,
         is_sip_start_of_month: bool = True,
-        return_rate: float = None
+        return_rate: float = None,
+        deterministic: bool = False
     ):
         """
         :param name: Asset name (e.g., "smallcap").
@@ -30,6 +31,7 @@ class Asset:
         self.feather_path = feather_path
         self.weight = weight
         self.is_sip_start_of_month = is_sip_start_of_month
+        self.deterministic = deterministic
 
         self.expected_return_rate: float = return_rate   # % annual, from rolling‐window XIRR
         self.asset_sip_amount: float = 0.0       # ₹ SIP per month for this asset

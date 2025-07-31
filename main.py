@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 
 from core.goal_engine import run_analysis
-from core.exceptions import DataFileNotFoundError
+from core.exceptions import DataFileNotFoundError, InvalidAllocationWeightsError
 from models.goal_request import GoalRequest
 from models.portfolio_summary import PortfolioSummary
 from utils.logger import get_logger
@@ -41,7 +41,8 @@ async def calculate_goal(req: GoalRequest) -> JSONResponse:
             goal_amount=req.goal_amount,
             time_horizon=req.time_horizon,
             lumpsum=req.lumpsum_amount,
-            risk_profile=req.risk_profile
+            risk_profile=req.risk_profile,
+            allocation=req.asset_allocation
         )
 
         _, peak = tracemalloc.get_traced_memory()
@@ -55,11 +56,13 @@ async def calculate_goal(req: GoalRequest) -> JSONResponse:
         # console.print_json(data=result.model_dump())
         return result
     except DataFileNotFoundError as e:
-        logger.exception("Unexpected error during goal calculation.")
+        logger.exception(e)
+        raise HTTPException(status_code=400, detail="One or more specified assets do not exist in database.")
+    except InvalidAllocationWeightsError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.exception("Unexpected error during goal calculation.")
-        raise HTTPException(status_code=500, detail="Internal error")
+        raise HTTPException(status_code=500, detail=f"Unexpected error during goal calculation: {str(e)}.")
 
 
 if __name__ == '__main__':

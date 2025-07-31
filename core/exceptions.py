@@ -1,5 +1,10 @@
 # ---- Asset.py ---- #
 
+class InvalidAllocationWeightsError(Exception):
+    def __init__(self):
+        message = "Specified weights do not sum to 1."
+        super().__init__(message)
+
 class InvalidReturnRateError(Exception):
     def __init__(self, erring_rate):
         message = f"Expected a positive return rate, but got: {erring_rate}. Rate must be > 0."

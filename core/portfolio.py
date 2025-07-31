@@ -10,6 +10,7 @@ from core.asset import Asset
 from core.xirr_calculator import XirrCalculator
 from models.asset_summary import AssetSummary
 from models.portfolio_summary import PortfolioSummary
+from core.exceptions import InvalidAllocationWeightsError
 
 class Portfolio:
     """
@@ -63,7 +64,7 @@ class Portfolio:
         """
         total = sum(asset.weight for asset in self.assets)
         if int(total + 1e-8) != 1:
-            raise ValueError("Portfolio asset weights do not sum to 1.")
+            raise InvalidAllocationWeightsError()
 
     def convert_assets_to_inr(self) -> None:
         """
@@ -193,7 +194,7 @@ class Portfolio:
             goal_achievement_probability=round(self.goal_achievement_probability * 100, 2),
             suggested_sip=(
                 round(self.suggested_sip, 2)
-                if self.suggested_sip > 1000
+                if self.suggested_sip - self.total_monthly_sip >= 1000
                 else "No additional SIP required."
             )
         )
@@ -249,7 +250,12 @@ class Portfolio:
 
         # Step 2: Sanity check for missing date_range
         if date_range is None:
-            raise ValueError("No asset contains NAV data. Cannot infer date range for simulation.")
+            start = pd.Timestamp.today().normalize()
+            # periods = self.time_horizon * 12 + 1
+            periods = self.time_horizon * 12 * 2
+            date_range = pd.date_range(start=start, periods=periods, freq='MS')  # 'MS' = Month Start
+            date_range = pd.Series(date_range)
+            # raise ValueError("No asset contains NAV data. Cannot infer date range for simulation.")
 
         # Step 3: Simulate missing assets
         for asset in to_do:
@@ -271,35 +277,62 @@ class Portfolio:
         num_simulations: int = 10_000
     ) -> float:
         """
-        Monte Carlo simulation to estimate probability of reaching goal_amount.
+        Monte Carlo simulation to estimate probability of reaching self.goal_amount
+        over self.total_months, given monthly_sip and optional lumpsum.
+
+        Assets with `asset.deterministic == True` will be simulated with zero volatility.
         """
         if self._composite_nav_df is None:
             self.prepare_composite_nav()
 
+        # --- compute historical log-returns ---
         log_returns = np.log(self._composite_nav_df / self._composite_nav_df.shift(1)).dropna()
-        mu = log_returns.mean().values
-        cov = log_returns.cov().values
+        mu = log_returns.mean().values                  # shape (n_assets,)
+        cov = log_returns.cov().values                  # shape (n_assets, n_assets)
 
+        # --- zero-out rows/cols for any deterministic asset ---
+        for idx, asset in enumerate(self.assets):
+            if getattr(asset, "deterministic", False):
+                cov[idx, :] = 0.0
+                cov[:, idx] = 0.0
+                mu[idx] = mu[idx]  # leave drift intact
+
+        # --- prepare allocations ---
         weights = np.array([a.weight for a in self.assets])
         months = self.total_months
         lumpsum_alloc = weights * lumpsum
-        sip_alloc = weights * monthly_sip
+        sip_alloc     = weights * monthly_sip
 
-        # Initialize values for each simulation
-        values = np.zeros((num_simulations, len(self.assets)))
-        L = np.linalg.cholesky(cov)
+        # --- set up simulation arrays ---
+        num_assets = len(self.assets)
+        values = np.zeros((num_simulations, num_assets))
+        # L = np.linalg.cholesky(cov)
+        try:
+            L = np.linalg.cholesky(cov)
+        except np.linalg.LinAlgError:
+            # Add small jitter to diagonal
+            jitter = 1e-8
+            cov += np.eye(cov.shape[0]) * jitter
+            L = np.linalg.cholesky(cov)
 
+        # --- run the Monte Carlo ---
         for m in range(months):
+            # add Lumpsum + SIP on month 0, else just SIP
             values += (lumpsum_alloc + sip_alloc) if m == 0 else sip_alloc
-            z = np.random.randn(num_simulations, len(self.assets))
+
+            # draw shocks
+            z = np.random.randn(num_simulations, num_assets)
+            # correlated returns
             returns = z @ L.T + mu
+            # apply to values
             values *= np.exp(returns)
 
+        # --- compute probability ---
         portfolio_vals = values.sum(axis=1)
         prob = float((portfolio_vals >= self.goal_amount).mean())
-        if self.goal_achievement_probability is None:
-            self.goal_achievement_probability = prob
+        self.goal_achievement_probability = prob
         return prob
+
 
     def suggest_sip_for_probability(
         self,

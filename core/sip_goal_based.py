@@ -1,6 +1,7 @@
 # SIP_Goal_Based.py
 from typing import Literal
 
+from models.goal_request import AssetAllocation
 from config import (
     AGGRESSIVE_PORTFOLIO,
     BALANCED_PORTFOLIO,
@@ -38,8 +39,9 @@ class SipGoalBased:
         self,
         goal: float,
         time_horizon: int,
-        lumpsum: float = 0.0,
-        risk_profile: Literal['conservative', 'balanced', 'aggressive'] = 'conservative'
+        lumpsum: float,
+        risk_profile: Literal['conservative', 'balanced', 'aggressive', 'custom'],
+        allocation: AssetAllocation
     ) -> None:
         """
         Directly sets parameters for testing (bypasses console input).
@@ -63,6 +65,11 @@ class SipGoalBased:
             self.asset_weights = CONSERVATIVE_PORTFOLIO
         elif risk_profile == 'balanced':
             self.asset_weights = BALANCED_PORTFOLIO
-        else:
+        elif risk_profile == 'aggressive':
             self.asset_weights = AGGRESSIVE_PORTFOLIO
+        elif risk_profile == 'custom':
+            if allocation is None:
+                raise ValueError('Custom Profile without allocation.')
+            allocs = {name: weight for name, weight in allocation.model_dump().items() if weight != 0}
+            self.asset_weights = allocs
         

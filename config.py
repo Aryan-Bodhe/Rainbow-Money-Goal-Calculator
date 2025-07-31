@@ -2,7 +2,7 @@ import os
 
 NUM_SIMULATIONS = 5000
 TARGET_PROB_OF_SUCCESS = 0.90
-USER_RISK_PROFILES = ['conservative', 'balanced', 'aggressive']     # ['conservative', 'balanced', 'aggressive']
+USER_RISK_PROFILES = ['conservative', 'balanced', 'aggressive', 'custom']     # ['conservative', 'balanced', 'aggressive']
 SIMULATION_TIME_HORIZONS = [1,3,5,10]   # [1,3,5,10]
 LOGGING_DIR = "logs/"
 LOGGING_LIMIT_DAYS = 10
