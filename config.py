@@ -20,14 +20,14 @@ CONSERVATIVE_PORTFOLIO = {
 
 BALANCED_PORTFOLIO = {
     "largecap": 0.30,
-    "s&p_500": 0.20,
+    "sp_500": 0.20,
     "gold": 0.3,
     "fixed_deposit": 0.2
 }
 
 AGGRESSIVE_PORTFOLIO = {
     "largecap": 0.4,
-    "s&p_500": 0.3,
+    "sp_500": 0.3,
     "gold": 0.30
 }
 
@@ -39,6 +39,6 @@ ASSET_RETURN_RATES = {
 # Ensure that the asset names here exist in the portfolios
 ASSET_NAV_DATA_PATH = {
     "largecap": os.path.join(os.getcwd(), "data/newfinal/monthly_nav/largecap.feather"),
-    "s&p_500":  os.path.join(os.getcwd(), "data/newfinal/monthly_nav/sp500.feather"),
+    "sp_500":  os.path.join(os.getcwd(), "data/newfinal/monthly_nav/sp500.feather"),
     "gold":     os.path.join(os.getcwd(), "data/newfinal/monthly_nav/gold.feather"),
 }
