@@ -132,23 +132,13 @@ def run_analysis(
         logger.exception("Probability/SIP suggestion failed")
         raise
 
-    # try:
-    # 2) Build the figure
-    fig = build_plotly_fig(xirrs, dates)
-
-    # 3a) Save as interactive HTML (so you can open it in your browser)
-    fig.write_html(
-        "temp/test_rolling_returns.html",
-        include_plotlyjs="cdn",  # embeds Plotly.js from CDN
-        full_html=True
-    )
-    # except Exception:
-    #     logger.warning('Plotly figure generation failed.')
 
     # 8) Summarize and return
     try:
         summary = portfolio.get_portfolio_summary()
-        logger.info("Portfolio summary generated")
+        summary.rolling_returns = xirrs
+        summary.dates = [d.strftime('%Y-%m-%d') for d in dates] if dates else None
+        logger.info("Portfolio summary generated with visualisation data.")
         return summary
     except Exception:
         logger.exception("Final summary generation failed")

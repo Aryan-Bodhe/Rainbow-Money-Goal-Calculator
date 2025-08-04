@@ -1,13 +1,12 @@
 # main.py
 
 import time as tm
-from rich.console import Console
 import tracemalloc
-import asyncio
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 
 from core.goal_engine import run_analysis
+from core.sip_plotter import generate_returns_html
 from core.exceptions import DataFileNotFoundError, InvalidAllocationWeightsError
 from models.goal_request import GoalRequest
 from models.portfolio_summary import PortfolioSummary
@@ -32,7 +31,7 @@ async def calculate_goal(req: GoalRequest) -> JSONResponse:
     Logs performance metrics and handles expected/unexpected exceptions.
     """
     logger = get_logger()
-    logger.info('---------- New Request Received ----------')
+    logger.info('------- New Goal Calculation Request Received -------')
     try:
         start = tm.time()
         tracemalloc.start()
@@ -49,33 +48,69 @@ async def calculate_goal(req: GoalRequest) -> JSONResponse:
         tracemalloc.stop()
         end = tm.time()
 
-        logger.info(f"Total Test Runtime: {end - start : 0.3f} s.")
+        logger.info(f"Total Request Runtime: {end - start : 0.3f} s.")
         logger.info(f"Peak memory usage: {peak / 10**6:.3f} MB")
         logger.info('Goal Calculation Completed Successfully.')
         logger.info('------------------------------------------')
-        # console.print_json(data=result.model_dump())
         return result
+    
     except DataFileNotFoundError as e:
         logger.exception(e)
         raise HTTPException(status_code=400, detail="One or more specified assets do not exist in database.")
+    
     except InvalidAllocationWeightsError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    
     except Exception as e:
         logger.exception("Unexpected error during goal calculation.")
         raise HTTPException(status_code=500, detail=f"Unexpected error during goal calculation: {str(e)}.")
 
+@app.post(
+    "/get-returns-visualization",
+    response_class=HTMLResponse,
+    summary="Get Interactive Returns Visualization",
+    description="""
+        Returns an interactive HTML visualization of the rolling returns distribution
+        and trend for the goal-based SIP analysis.
+    """
+)
+async def get_returns_visualization(
+    pf_summary: PortfolioSummary
+) -> HTMLResponse:
+    """
+    Generate and return an interactive HTML visualization of rolling returns.
+    """
+    logger = get_logger()
+    logger.info('------- New Visualization Request Received -------')
+    try:        
+        start = tm.time()
+        tracemalloc.start()
+        
+        rolling_returns = pf_summary.rolling_returns
+        dates = pf_summary.dates
 
-if __name__ == '__main__':
-    console = Console()
-    output = asyncio.run( 
-        calculate_goal(
-            GoalRequest(
-                goal_amount=1_000_000,
-                time_horizon=5,
-                lumpsum_amount=0,
-                risk_profile='conservative',
-            )
-        )
-    )
+        if rolling_returns is None:
+            logger.warning('Rolling Returns List is empty.')
+        if dates is None:
+            logger.warning('Dates List is empty.')
+        
+        html_content = generate_returns_html(rolling_returns, dates)
+        logger.info('Rolling Returns and Returns Distribution chart generated.')
 
+        _, peak = tracemalloc.get_traced_memory()
+        tracemalloc.stop()
+        end = tm.time()
+        logger.info(f"Total Request Runtime: {end - start : 0.3f} s.")
+        logger.info(f"Peak memory usage: {peak / 10**6:.3f} MB")
+        logger.info('Returns Visualization Completed Successfully.')
+        logger.info('------------------------------------------')
 
+        return HTMLResponse(content=html_content)
+    
+    except DataFileNotFoundError as e:
+        logger.error(f"Data file not found: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+    
+    except Exception as e:
+        logger.error(f"Error generating visualization: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))

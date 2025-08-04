@@ -178,6 +178,15 @@ class Portfolio:
             else 0
         )
 
+        months = list(range(self.total_months + 1))  # 0 to total_months inclusive
+        
+        # Ensure cumulative_returns and cumulative_investment are properly aligned with months
+        if len(self.cumulative_returns) != len(months):
+            # If simulation didn't run properly, provide empty arrays
+            if not self.cumulative_returns or not self.cumulative_investment:
+                self.cumulative_returns = [0.0] * len(months)
+                self.cumulative_investment = [0.0] * len(months)
+
         return PortfolioSummary(
             goal_amount=self.goal_amount,
             time_horizon=self.time_horizon,
@@ -196,7 +205,10 @@ class Portfolio:
                 round(self.suggested_sip, 2)
                 if self.suggested_sip - self.total_monthly_sip >= 1000
                 else "No additional SIP required."
-            )
+            ),
+            months=months,
+            cumulative_investment=[round(x, 2) for x in self.cumulative_investment],
+            cumulative_returns=[round(x, 2) for x in self.cumulative_returns]
         )
     
     def _simulate_asset_navs(self, asset: Asset, date_range: pd.Series, base_price: float = 10.0):
@@ -330,7 +342,8 @@ class Portfolio:
         # --- compute probability ---
         portfolio_vals = values.sum(axis=1)
         prob = float((portfolio_vals >= self.goal_amount).mean())
-        self.goal_achievement_probability = prob
+        if self.goal_achievement_probability is None:
+            self.goal_achievement_probability = prob
         return prob
 
 

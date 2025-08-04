@@ -1,101 +1,4 @@
-# # SIP_Plotter.py
-
-# import os
-# from typing import List
-# import numpy as np
-# import matplotlib.pyplot as plt
-# import seaborn as sns
-# import matplotlib.dates as mdates
-# import pandas as pd
-
-# import matplotlib.pyplot as plt
-# from matplotlib.ticker import (
-#     MultipleLocator,
-#     FixedLocator,
-#     FuncFormatter
-# )
-
-# class SipPlotter:
-#     """
-#     A class to visualize SIP portfolio performance (multi-asset) using matplotlib.
-#     """
-
-#     def __init__(self):
-#         pass
-
-
-#     def plot_rolling_returns(self, rolling_returns, dates=None, bins=20, kde_bw=0.7):
-#         """
-#         Plots side-by-side:
-#         1) Distribution of rolling returns (histogram + KDE) with mode & median
-#         2) Trendline of rolling returns over time or index
-        
-#         Parameters
-#         ----------
-#         rolling_returns : list, ndarray, or pd.Series
-#             Sequence of numeric rolling-return values.
-#         dates : list of datetime, pd.DatetimeIndex, or None
-#             Matching dates for each return. If None, uses integer index [0,1,2...].
-#         bins : int
-#             Number of bins for the histogram.
-#         kde_bw : float
-#             Bandwidth adjustment for the KDE curve (smaller → less smooth).
-#         """
-#         # Convert to NumPy array
-#         rr = np.asarray(rolling_returns)
-#         n = rr.shape[0]
-        
-#         # Compute mode via the highest-count bin
-#         counts, edges = np.histogram(rr, bins=bins)
-#         mode_idx = np.argmax(counts)
-#         mode_val = (edges[mode_idx] + edges[mode_idx+1]) / 2
-#         median_val = np.median(rr)
-        
-#         # Prepare x-axis for trendline
-#         if dates is not None:
-#             x = pd.to_datetime(dates)
-#             use_dates = True
-#         else:
-#             x = np.arange(n)
-#             use_dates = False
-        
-#         # Aesthetic theme
-#         sns.set_theme(style="whitegrid", font_scale=1.1)
-        
-#         # Figure & axes
-#         fig, (ax_dist, ax_trend) = plt.subplots(
-#             1, 2, figsize=(14,5), 
-#             gridspec_kw={"width_ratios":[1,1.2]}
-#         )
-        
-#         # 1) Histogram + KDE
-#         plt.figure(figsize=(12,10))
-#         sns.histplot(rr, bins=bins, alpha=0.6, edgecolor="black", ax=ax_dist)
-#         sns.kdeplot(rr, bw_adjust=kde_bw, ax=ax_dist, color="navy", linewidth=2)
-#         ax_dist.axvline(mode_val, color="purple", linestyle="-.", label="Mode")
-#         ax_dist.axvline(median_val, color="brown",  linestyle=":",  label="Median")
-#         ax_dist.set_title("Distribution of Rolling Returns", pad=15)
-#         ax_dist.set_xlabel("Rolling Return")
-#         ax_dist.set_ylabel("Frequency / Density")
-#         ax_dist.legend()
-#         ax_dist.tick_params(axis="x", rotation=0)
-        
-#         # 2) Trendline
-#         ax_trend.plot(x, rr, marker="o", linewidth=2, markersize=4)
-#         if use_dates:
-#             ax_trend.xaxis.set_major_formatter(mdates.DateFormatter('%b %d'))
-#         ax_trend.tick_params(axis="x", rotation=0)
-#         ax_trend.set_title("Rolling Returns Over Time", pad=15)
-#         ax_trend.set_xlabel("Date" if use_dates else "Index")
-#         ax_trend.set_ylabel("Rolling Return")
-#         ax_trend.grid(True, linestyle="--", alpha=0.5)
-        
-#         # Super-title and layout
-#         fig.suptitle("Rolling Returns: Distribution and Trend", fontsize=16, y=1.02)
-#         fig.tight_layout()
-#         plt.savefig('freq_dist_chart.png', dpi=400)
-#         plt.show()
-
+import json
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 import numpy as np
@@ -129,7 +32,7 @@ def build_plotly_fig(rolling_returns, dates=None, bins=20, kde_bw=0.7):
 
     # Subplot figure
     fig = make_subplots(
-        rows=2, cols=1,
+        rows=1, cols=2,
         # column_widths=[0.6, 0.4],
         subplot_titles=("Rolling Returns Over Time", "Distribution of Rolling Returns")
     )
@@ -150,7 +53,7 @@ def build_plotly_fig(rolling_returns, dates=None, bins=20, kde_bw=0.7):
             marker_line_width=1,      
             hovertemplate="Range: %{x:.2f}%, Count: %{y}<extra></extra>"
         ),
-        row=2, col=1
+        row=1, col=2
     )
 
     # Mode & Median
@@ -162,7 +65,7 @@ def build_plotly_fig(rolling_returns, dates=None, bins=20, kde_bw=0.7):
             name="Mode",
             hovertemplate="Mode: %{x:.2f}%<extra></extra>"
         ),
-        row=2, col=1
+        row=1, col=2
     )
     fig.add_trace(
         go.Scatter(
@@ -172,7 +75,7 @@ def build_plotly_fig(rolling_returns, dates=None, bins=20, kde_bw=0.7):
             name="Median",
             hovertemplate="Median: %{x:.2f}%<extra></extra>"
         ),
-        row=2, col=1
+        row=1, col=2
     )
 
     #---------------------------
@@ -193,8 +96,8 @@ def build_plotly_fig(rolling_returns, dates=None, bins=20, kde_bw=0.7):
     # Layout & formatting
     fig.update_xaxes(title_text=x_title, row=1, col=1)
     fig.update_yaxes(title_text="Rolling Returns %",  row=1, col=1)
-    fig.update_xaxes(title_text="Rolling Returns %",  row=2, col=1)
-    fig.update_yaxes(title_text="Frequency",       row=2, col=1)
+    fig.update_xaxes(title_text="Rolling Returns %",  row=1, col=2)
+    fig.update_yaxes(title_text="Frequency",       row=1, col=2)
     fig.update_layout(xaxis=dict(type='date'))
     fig.update_layout(
         legend=dict(
@@ -213,17 +116,59 @@ def build_plotly_fig(rolling_returns, dates=None, bins=20, kde_bw=0.7):
     )
     return fig
 
-@app.post("/rolling-returns-spec")
-async def rolling_returns_spec(payload: dict):
-    """
-    Request JSON: { "returns": [..], "dates": [..] }  # dates optional
-    Response JSON: Plotly figure spec (data + layout)
-    """
-    returns = payload.get("returns")
-    if returns is None:
-        raise HTTPException(400, "Missing 'returns' array")
-    dates = payload.get("dates", None)
-    fig = build_plotly_fig(returns, dates)
-    # Return the full figure spec as JSON
-    return JSONResponse(status_code=200, content=fig.to_dict())
 
+def generate_returns_html(rolling_returns, dates=None):
+    if not rolling_returns:
+        return """
+        <div style="display:flex;justify-content:center;align-items:center;height:100%">
+            <p style="color:#666;text-align:center">
+                No rolling returns data available.<br>
+                Try calculating the goal again.
+            </p>
+        </div>
+        """
+
+    fig = build_plotly_fig(rolling_returns, dates)
+
+    # Grab exactly the same snippet you used before
+    snippet = fig.to_html(include_plotlyjs="cdn", full_html=False)
+
+    # Inject it into the wrapper above
+    html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+            <style>
+            html, body {{
+                margin: 0;
+                padding: 0;
+                width: 100%;
+                height: 100%;
+                overflow: hidden;
+            }}
+            #graph {{
+                position: relative;
+                width: 100%;
+                height: 100%;
+                display: block;
+            }}
+            #graph .plotly-graph-div,
+            #graph .js-plotly-plot {{
+                position: absolute !important;
+                top: 0 !important;
+                left: 0 !important;
+                width: 100% !important;
+                height: 100% !important;
+            }}
+            </style>
+        </head>
+        <body>
+            <div id="graph">
+            {snippet}
+            </div>
+        </body>
+        </html>
+    """
+    return html
