@@ -4,6 +4,43 @@ from logging.handlers import TimedRotatingFileHandler
 from colorama import Fore, Style, init as colorama_init
 from config import LOGGING_DIR, LOGGING_LIMIT_DAYS
 
+"""
+    Create and configure a colorized, rotating logger instance.
+
+    This function returns a `logging.Logger` with:
+    - Console output using colorized log levels (via `colorama`)
+    - File logging with daily rotation (via `TimedRotatingFileHandler`)
+    - Automatic log file directory creation
+    - Retention of log files up to `LOGGING_LIMIT_DAYS` days
+    - Rotated files renamed from "app.log.YYYY-MM-DD" to "app.YYYY-MM-DD.log"
+
+    Parameters
+    ----------
+    name : str, optional
+        The logger name. Defaults to "app".
+    level : int, optional
+        Logging level (e.g., `logging.DEBUG`, `logging.INFO`). Defaults to `logging.INFO`.
+
+    Returns
+    -------
+    logging.Logger
+        A configured logger instance.
+
+    Notes
+    -----
+    - Console log messages are color-coded by severity:
+        DEBUG (cyan), INFO (white), WARNING (yellow), ERROR (red), CRITICAL (bright red).
+    - File logs are stored in the `LOGGING_DIR` directory from `config.py`.
+    - Daily rotation happens at midnight, with filenames in the format:
+      `app.YYYY-MM-DD.log`.
+
+    Example
+    -------
+    >> logger = get_logger()
+    >> logger.info("Application started")
+    >> logger.error("An error occurred")
+"""
+
 # Initialize colorama for Windows support
 colorama_init(autoreset=True)
 
